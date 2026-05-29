@@ -1,0 +1,19 @@
+{
+  "id": "product-fit-check__long-form-product-fit",
+  "title": "Long-form product fit",
+  "description": "8-turn slow-burn product fit discussion.",
+  "intent": "product-fit-check",
+  "persona": "skeptical-evaluator",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Decide whether to start a trial.",
+  "turn_count": 8,
+  "constraints": [],
+  "expected_outcome": "Conversation stays coherent across all turns.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "product-fit-check__time-pressed-founder",
+  "title": "Time-pressed founder",
+  "description": "Founder with 60 seconds — wants top-line answer.",
+  "intent": "product-fit-check",
+  "persona": "time-pressed-founder",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Confirm whether the product fits a small team without a long pitch.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "Bot stays concise; no rambling pitch.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "pricing-inquiry__simple-pricing-question",
+  "title": "Simple pricing question",
+  "description": "Polite buyer asking about monthly plans.",
+  "intent": "pricing-inquiry",
+  "persona": "polite-buyer",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Find out if monthly pricing exists and roughly how much.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "Bot states pricing or offers to follow up by email.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

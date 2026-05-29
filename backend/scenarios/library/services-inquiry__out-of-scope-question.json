@@ -1,0 +1,19 @@
+{
+  "id": "services-inquiry__out-of-scope-question",
+  "title": "Out-of-scope question",
+  "description": "Asks about a totally unrelated product (Spotify).",
+  "intent": "services-inquiry",
+  "persona": "polite-buyer",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "out-of-scope-question",
+  "goal": "See if bot stays within FFTech scope.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "Bot politely declines and redirects to FFTech topics.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

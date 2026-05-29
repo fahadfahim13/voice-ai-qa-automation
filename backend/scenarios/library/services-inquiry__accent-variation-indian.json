@@ -1,0 +1,19 @@
+{
+  "id": "services-inquiry__accent-variation-indian",
+  "title": "Accent variation — Indian",
+  "description": "Indian English caller.",
+  "intent": "services-inquiry",
+  "persona": "polite-buyer",
+  "accent": "en-IN",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Ask about services.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "STT handles accent; bot responds appropriately.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "pricing-inquiry__interrupt-mid-greeting",
+  "title": "Interrupt mid-greeting",
+  "description": "Caller starts speaking before bot finishes greeting.",
+  "intent": "pricing-inquiry",
+  "persona": "time-pressed-founder",
+  "accent": "en-US",
+  "interrupt": "early-interject",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Test the bot's barge-in handling.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "Bot truncates greeting and addresses the question.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

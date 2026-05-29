@@ -1,0 +1,19 @@
+{
+  "id": "pricing-inquiry__accent-variation-british",
+  "title": "Accent variation — British",
+  "description": "British English caller.",
+  "intent": "pricing-inquiry",
+  "persona": "polite-buyer",
+  "accent": "en-GB",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Same as standard pricing question.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "STT recognises accent without major errors.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

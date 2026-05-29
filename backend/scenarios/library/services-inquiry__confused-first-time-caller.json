@@ -1,0 +1,19 @@
+{
+  "id": "services-inquiry__confused-first-time-caller",
+  "title": "Confused first-time caller",
+  "description": "User isn't sure what FFTech does. Needs hand-holding.",
+  "intent": "services-inquiry",
+  "persona": "confused-newbie",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Get a plain-English overview.",
+  "turn_count": 4,
+  "constraints": [],
+  "expected_outcome": "Bot uses jargon-free language and offers next-step.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "location-hours__location-and-hours",
+  "title": "Location and hours",
+  "description": "Asks where the business is located and when it's open.",
+  "intent": "location-hours",
+  "persona": "polite-buyer",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Find office hours.",
+  "turn_count": 3,
+  "constraints": [],
+  "expected_outcome": "Bot answers from its knowledge base or defers honestly.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

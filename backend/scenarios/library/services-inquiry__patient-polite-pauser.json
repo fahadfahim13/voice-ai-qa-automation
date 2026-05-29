@@ -1,0 +1,19 @@
+{
+  "id": "services-inquiry__patient-polite-pauser",
+  "title": "Patient polite pauser",
+  "description": "Long pauses between turns; tests bot's no-input handling.",
+  "intent": "services-inquiry",
+  "persona": "polite-buyer",
+  "accent": "en-US",
+  "interrupt": "polite-pause",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Slowly understand the product offering.",
+  "turn_count": 4,
+  "constraints": [],
+  "expected_outcome": "Bot doesn't disconnect on long silences.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

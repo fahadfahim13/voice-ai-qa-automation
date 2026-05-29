@@ -1,0 +1,19 @@
+{
+  "id": "services-inquiry__skeptical-evaluator-deep-dive",
+  "title": "Skeptical evaluator deep dive",
+  "description": "Asks pointed product-detail questions; long context.",
+  "intent": "services-inquiry",
+  "persona": "skeptical-evaluator",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Probe for specific feature claims; require evidence.",
+  "turn_count": 6,
+  "constraints": [],
+  "expected_outcome": "Bot grounds answers in its knowledge base or defers honestly.",
+  "criterion_weights": [],
+  "caller_voice": null
+}

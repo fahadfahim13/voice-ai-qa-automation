@@ -1,0 +1,19 @@
+{
+  "id": "booking-request__booking-request-standard",
+  "title": "Booking request — standard",
+  "description": "Wants to schedule a 15-minute intro call.",
+  "intent": "booking-request",
+  "persona": "polite-buyer",
+  "accent": "en-US",
+  "interrupt": "none",
+  "noise": "clean",
+  "complexity": "multi-turn",
+  "language": "english",
+  "adversarial": "none",
+  "goal": "Book a meeting via Google Calendar integration.",
+  "turn_count": 4,
+  "constraints": [],
+  "expected_outcome": "Bot collects email/time or hands off to booking link.",
+  "criterion_weights": [],
+  "caller_voice": null
+}
