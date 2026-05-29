@@ -113,19 +113,37 @@ async def open_widget(
     captured = await _capture_widget_call_request(page)
 
     logger.info("Navigating to {}", preview_url)
-    await page.goto(preview_url, wait_until="networkidle", timeout=45_000)
-    await page.wait_for_timeout(2000)
-    await page.screenshot(path=str(screenshot_dir / "01_landed.png"), full_page=False)
+    # The widget is a React-injected floating button. Retry up to 3 times:
+    # the bundle occasionally fails to mount on a first load (analytics beacons
+    # competing, transient CDN slowness). A reload reliably fixes it.
+    btn: Locator | None = None
+    for attempt in range(3):
+        if attempt == 0:
+            await page.goto(preview_url, wait_until="domcontentloaded", timeout=60_000)
+        else:
+            logger.warning("Talk-to-us button missing; reloading (attempt {})", attempt + 1)
+            await page.reload(wait_until="domcontentloaded", timeout=60_000)
+        await page.wait_for_timeout(4000)
+        await page.screenshot(path=str(screenshot_dir / "01_landed.png"), full_page=False)
+        btn = await _find_talk_button(page)
+        try:
+            await btn.wait_for(state="visible", timeout=20_000)
+            break
+        except PWTimeout:
+            btn = None
+            continue
+    if btn is None:
+        await page.screenshot(
+            path=str(screenshot_dir / "fail_no_talk_button.png"), full_page=True
+        )
+        raise RuntimeError("Could not locate the Talk-to-us / Call-us button after retries")
 
-    # Step 1 — open the panel
-    btn = await _find_talk_button(page)
     try:
-        await btn.wait_for(state="visible", timeout=15_000)
-    except PWTimeout:
-        await page.screenshot(path=str(screenshot_dir / "fail_no_talk_button.png"), full_page=True)
-        raise RuntimeError("Could not locate the Talk to us button")
+        btn_label = (await btn.inner_text(timeout=1500)).strip()
+    except Exception:
+        btn_label = "Talk to us / Call us"
 
-    logger.info("Clicking Talk to us (open panel)")
+    logger.info("Clicking {!r} (open panel)", btn_label)
     await btn.click()
     await page.wait_for_timeout(panel_wait_ms)
     await page.screenshot(path=str(screenshot_dir / "02_panel_open.png"), full_page=False)

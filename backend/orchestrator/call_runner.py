@@ -65,13 +65,20 @@ class CallArtifacts:
 async def _find_conversation(
     site_id: str, since: datetime, max_wait_s: float = 30.0
 ) -> dict | None:
+    # /api/widget/init reports the canonical siteId (e.g. "webwaala.com"),
+    # but conversations are persisted under "<siteId>-preview" for preview
+    # tenants. Try both.
+    candidates = [site_id]
+    if site_id and not site_id.endswith("-preview"):
+        candidates.append(f"{site_id}-preview")
     deadline = asyncio.get_event_loop().time() + max_wait_s
     async with QaApiClient() as q:
         while asyncio.get_event_loop().time() < deadline:
-            page = await q.list_conversations(site_id=site_id, since=since, limit=5)
-            if page.conversations:
-                full = await q.get_conversation(page.conversations[0].sessionId)
-                return full.model_dump(mode="json")
+            for sid in candidates:
+                page = await q.list_conversations(site_id=sid, since=since, limit=5)
+                if page.conversations:
+                    full = await q.get_conversation(page.conversations[0].sessionId)
+                    return full.model_dump(mode="json")
             await asyncio.sleep(1.5)
     return None
 
