@@ -20,6 +20,7 @@ from backend.orchestrator import run_suite
 from backend.report import write_report
 from backend.scenarios import load_library
 from backend.settings import get_settings
+from backend.url_builder import build_preview_url
 
 DEFAULT_BIZ = (
     "FFTech SaaS — productivity web app for tracking daily habits and administering "
@@ -39,6 +40,15 @@ def main(
     headless: bool = typer.Option(False, "--headless"),
     audio_judge: bool = typer.Option(True, "--audio-judge/--no-audio-judge"),
     concurrency: int = typer.Option(1, "--concurrency"),
+    site: str = typer.Option(
+        None, "--site", help="Target website hostname (e.g. webwaala.com). Overrides .env QA_PREVIEW_URL."
+    ),
+    preview_url: str = typer.Option(
+        None, "--preview-url", help="Full preview URL override; trumps --site."
+    ),
+    url_pattern: str = typer.Option(
+        "preview_id", "--url-pattern", help="URL shape: preview_id (/preview?id=) or preview_query (/?preview=)."
+    ),
 ) -> None:
     setup_logging()
     s = get_settings()
@@ -51,6 +61,11 @@ def main(
         scenarios = scenarios[:max_n]
     logger.info("Running {} scenarios", len(scenarios))
 
+    resolved_preview = preview_url or (
+        build_preview_url(s.qa_base_url, site, pattern=url_pattern) if site else None
+    )
+    site_override = site if (site and s.qa_site_id == "qa-judge") else None
+
     asyncio.run(
         run_suite(
             scenarios,
@@ -58,6 +73,8 @@ def main(
             headless=headless,
             do_audio_judge=audio_judge,
             concurrency=concurrency,
+            preview_url=resolved_preview,
+            site_id_override=site_override,
         )
     )
     suite_dir = Path(s.harness_reports_dir)

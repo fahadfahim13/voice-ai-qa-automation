@@ -53,10 +53,18 @@ class CallArtifacts:
     cost_usd: float = 0.0
     error: str | None = None
     qa_messages: list[dict] = field(default_factory=list)
+    full_call_audio: Path | None = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        for k in ("out_dir", "scenario_wav", "bot_audio", "conversation_json", "audio_log_json"):
+        for k in (
+            "out_dir",
+            "scenario_wav",
+            "bot_audio",
+            "conversation_json",
+            "audio_log_json",
+            "full_call_audio",
+        ):
             if d[k] is not None:
                 d[k] = str(d[k])
         return d
@@ -92,10 +100,13 @@ async def run_call(
     voice: str | None = None,
     headless: bool = False,
     extra_silence_after_last_turn_sec: float = 6.0,
+    preview_url: str | None = None,
+    site_id_override: str | None = None,
 ) -> CallArtifacts:
     """Execute one scripted call against the BizFinder voice widget."""
     s = get_settings()
     out_dir.mkdir(parents=True, exist_ok=True)
+    effective_preview_url = preview_url or s.qa_preview_url
 
     # 1. TTS each turn.
     tts = get_tts(target_sample_rate=DEFAULT_SR)
@@ -136,7 +147,7 @@ async def run_call(
         wav_duration, scenario_wav.stat().st_size / 1024, total_cost,
     )
 
-    origin = f"{urlparse(s.qa_preview_url).scheme}://{urlparse(s.qa_preview_url).netloc}"
+    origin = f"{urlparse(effective_preview_url).scheme}://{urlparse(effective_preview_url).netloc}"
     since = datetime.now(UTC) - timedelta(seconds=5)
 
     artifacts = CallArtifacts(
@@ -158,7 +169,7 @@ async def run_call(
             try:
                 state = await open_widget(
                     page,
-                    s.qa_preview_url,
+                    effective_preview_url,
                     screenshot_dir=out_dir,
                     call_setup_wait_ms=4000,
                 )
@@ -188,6 +199,19 @@ async def run_call(
                     json.dumps(log, indent=2, default=str), encoding="utf-8"
                 )
 
+                if artifacts.bot_audio is not None:
+                    try:
+                        from backend.audio_mix import build_full_call
+
+                        artifacts.full_call_audio = build_full_call(
+                            scenario_wav=artifacts.scenario_wav,
+                            bot_audio=artifacts.bot_audio,
+                            audio_log_path=artifacts.audio_log_json,
+                            out_path=out_dir / "full_call.wav",
+                        )
+                    except Exception as e:
+                        logger.warning("full_call.wav build failed: {}", e)
+
                 await hangup(page)
                 await page.wait_for_timeout(1500)
             except Exception as e:
@@ -199,8 +223,9 @@ async def run_call(
                     pass
 
     # Pull conversation from QA Read API.
-    if artifacts.resolved_site_id:
-        conv = await _find_conversation(artifacts.resolved_site_id, since)
+    lookup_site_id = artifacts.resolved_site_id or site_id_override
+    if lookup_site_id:
+        conv = await _find_conversation(lookup_site_id, since)
         if conv is not None:
             artifacts.conversation_json = out_dir / "conversation.json"
             artifacts.conversation_json.write_text(

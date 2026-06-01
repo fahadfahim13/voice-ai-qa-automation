@@ -23,6 +23,18 @@ from backend.scenarios import Scenario
 from backend.settings import get_settings
 
 
+AXIS_NAMES = (
+    "intent",
+    "persona",
+    "accent",
+    "interrupt",
+    "noise",
+    "complexity",
+    "language",
+    "adversarial",
+)
+
+
 @dataclass
 class CallResult:
     scenario_id: str
@@ -33,6 +45,8 @@ class CallResult:
     audio_verdict: dict | None = None
     error: str | None = None
     elapsed_seconds: float = 0.0
+    scenario_title: str = ""
+    axes: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -46,6 +60,8 @@ class SuiteResult:
     n_errors: int
     avg_overall_score: float
     calls: list[CallResult] = field(default_factory=list)
+    coverage_by_axis: dict = field(default_factory=dict)
+    failure_breakdown: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -65,6 +81,8 @@ async def _run_one(
     headless: bool,
     or_client: OpenRouterClient,
     do_audio_judge: bool,
+    preview_url: str | None = None,
+    site_id_override: str | None = None,
 ) -> CallResult:
     start = datetime.now(UTC)
     out_dir = suite_dir / f"call_{scenario.id}"
@@ -74,6 +92,8 @@ async def _run_one(
         out_dir=out_dir,
         script_json=out_dir / "script.json",
         artifacts={},
+        scenario_title=scenario.title,
+        axes=dict(zip(AXIS_NAMES, scenario.axis_tuple(), strict=True)),
     )
     try:
         seed = ScenarioSeed(
@@ -92,6 +112,8 @@ async def _run_one(
             out_dir=out_dir,
             headless=headless,
             voice=scenario.caller_voice,
+            preview_url=preview_url,
+            site_id_override=site_id_override,
         )
         result.artifacts = artifacts.to_dict()
 
@@ -138,6 +160,8 @@ async def run_suite(
     headless: bool = False,
     do_audio_judge: bool = True,
     concurrency: int = 1,
+    preview_url: str | None = None,
+    site_id_override: str | None = None,
 ) -> SuiteResult:
     """Run a list of scenarios sequentially (default) or with a small concurrency.
 
@@ -162,6 +186,8 @@ async def run_suite(
                 headless=headless,
                 or_client=or_client,
                 do_audio_judge=do_audio_judge,
+                preview_url=preview_url,
+                site_id_override=site_id_override,
             )
             results.append(r)
     else:
@@ -176,6 +202,8 @@ async def run_suite(
                     headless=headless,
                     or_client=or_client,
                     do_audio_judge=do_audio_judge,
+                    preview_url=preview_url,
+                    site_id_override=site_id_override,
                 )
 
         results = await asyncio.gather(*[_bounded(sc) for sc in scenario_list])
@@ -192,6 +220,12 @@ async def run_suite(
     )
     n_errors = sum(1 for r in results if r.error)
 
+    from backend.report.coverage import (
+        compute_coverage,
+        compute_failure_breakdown,
+        write_summary_csv,
+    )
+
     suite = SuiteResult(
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
@@ -202,10 +236,13 @@ async def run_suite(
         n_errors=n_errors,
         avg_overall_score=(sum(scores) / len(scores)) if scores else 0.0,
         calls=results,
+        coverage_by_axis=compute_coverage(results),
+        failure_breakdown=compute_failure_breakdown(results),
     )
     (suite_dir / "suite.json").write_text(
         json.dumps(suite.to_dict(), indent=2, default=str), encoding="utf-8"
     )
+    write_summary_csv(suite_dir, suite)
     logger.success(
         "Suite done: {} total, {} passed, {} failed, {} errors  avg={:.2f}",
         suite.n_total, suite.n_passed, suite.n_failed, suite.n_errors, suite.avg_overall_score,

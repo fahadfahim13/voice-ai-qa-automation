@@ -12,8 +12,8 @@ REPORT_TEMPLATE = Template(
 <!doctype html>
 <html><head><meta charset="utf-8"><title>BizFinder Voice QA — {{ suite_id }}</title>
 <style>
-body{font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;margin:24px}
-h1{margin:0 0 4px;color:#111827}h2{margin:24px 0 8px;color:#111827}
+body{font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;margin:24px;max-width:1100px}
+h1{margin:0 0 4px;color:#111827}h2{margin:24px 0 8px;color:#111827}h3{margin:18px 0 4px}
 .muted{color:#6b7280}
 table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
 th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
@@ -24,6 +24,13 @@ th{background:#f3f4f6}
 .bar.warn > div{background:#f59e0b}
 .bar.bad > div{background:#ef4444}
 .evidence{font-style:italic;color:#374151}
+.chip{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:10px;padding:1px 8px;margin:0 4px 4px 0;font-size:11px}
+.coverage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.coverage-grid h4{margin:0 0 4px;font-size:13px;color:#374151;text-transform:capitalize}
+.coverage-grid table{margin:0;font-size:12px}
+details{margin:8px 0}
+summary{cursor:pointer;color:#4338ca}
+audio{display:block;width:100%;margin:6px 0}
 </style></head><body>
 <h1>BizFinder Voice QA — Suite report</h1>
 <p class="muted">{{ started_at }} → {{ finished_at }} · {{ n_total }} calls · avg score {{ '%.2f' % avg_overall_score }}</p>
@@ -34,6 +41,48 @@ th{background:#f3f4f6}
 <tr><th>Total</th><th>Passed</th><th>Failed</th><th>Errors</th><th>Avg score</th></tr>
 <tr><td>{{ n_total }}</td><td class="pass">{{ n_passed }}</td><td class="fail">{{ n_failed }}</td><td class="err">{{ n_errors }}</td><td>{{ '%.2f' % avg_overall_score }}</td></tr>
 </table>
+
+{% if coverage_by_axis %}
+<h2>Coverage by axis</h2>
+<p class="muted">How many scenarios exercised each value of each test axis, and how they fared.</p>
+<div class="coverage-grid">
+{% for axis, values in coverage_by_axis.items() %}
+  <div>
+    <h4>{{ axis }}</h4>
+    <table>
+      <tr><th>Value</th><th>Total</th><th class="pass">Pass</th><th class="fail">Fail</th><th class="err">Err</th><th>Avg</th></tr>
+      {% for vname, b in values.items() %}
+      <tr>
+        <td>{{ vname }}</td>
+        <td>{{ b.total }}</td>
+        <td class="pass">{{ b.passed }}</td>
+        <td class="fail">{{ b.failed }}</td>
+        <td class="err">{{ b.errors }}</td>
+        <td>{{ '%.2f' % b.avg_score }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if failure_breakdown %}
+<h2>Failure breakdown</h2>
+<p class="muted">Every criterion that scored below 0.4, across all failing scenarios — grouped by criterion.</p>
+<table>
+  <tr><th>Criterion</th><th>Scenario</th><th>Title</th><th>Score</th><th>Evidence</th></tr>
+{% for row in failure_breakdown %}
+  <tr>
+    <td>{{ row.criterion }}</td>
+    <td>{{ row.scenario_id }}</td>
+    <td>{{ row.title }}</td>
+    <td class="fail">{{ '%.2f' % row.score }}</td>
+    <td><span class="evidence">{{ row.evidence }}</span><br>{{ row.rationale }}</td>
+  </tr>
+{% endfor %}
+</table>
+{% endif %}
 
 <h2>Calls</h2>
 {% for c in calls %}
@@ -46,7 +95,14 @@ th{background:#f3f4f6}
     {% endif %}
     {% if v %} · overall {{ '%.2f' % v.overall_score }}{% endif %}
   </h3>
+  {% if c.scenario_title %}<p><strong>{{ c.scenario_title }}</strong></p>{% endif %}
+  {% if c.axes %}<p>{% for ax, vv in c.axes.items() %}<span class="chip">{{ ax }}: {{ vv }}</span>{% endfor %}</p>{% endif %}
   <p class="muted">elapsed {{ '%.1f' % c.elapsed_seconds }}s · session {{ c.artifacts.session_id or '—' }}</p>
+  {% if c.artifacts and c.artifacts.full_call_audio %}
+    <details><summary>Listen to the full call (caller L · bot R)</summary>
+      <audio controls preload="none" src="call_{{ c.scenario_id }}/full_call.wav"></audio>
+    </details>
+  {% endif %}
   {% if c.error %}<p class="fail">Error: {{ c.error }}</p>{% endif %}
   {% if v %}
   <p>{{ v.summary }}</p>
