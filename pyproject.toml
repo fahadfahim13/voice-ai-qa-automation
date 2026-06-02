@@ -21,6 +21,7 @@ dependencies = [
     "typer>=0.13",
     "edge-tts>=7.0",
     "jinja2>=3.1",
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.optional-dependencies]

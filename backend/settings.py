@@ -6,6 +6,7 @@ Single source of truth for credentials, endpoints, model choices.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     qa_base_url: str = "https://bizfinder.ai"
     qa_site_id: str = "qa-judge"
     qa_preview_url: str = "https://bizfinder.ai/"
+    qa_preview_url_pattern: Literal["preview_id", "preview_query"] = "preview_id"
     qa_rate_limit_rps: float = 1.0
 
     openrouter_api_key: str = ""

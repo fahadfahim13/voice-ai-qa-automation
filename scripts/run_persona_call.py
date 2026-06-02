@@ -29,6 +29,7 @@ from backend.caller import (
 from backend.logging import setup_logging
 from backend.orchestrator import run_call
 from backend.settings import get_settings
+from backend.url_builder import build_preview_url
 
 DEFAULT_BIZ_SUMMARY = (
     "FFTech SaaS — a productivity web app for tracking daily habits and "
@@ -49,8 +50,22 @@ def main(
     biz_summary: str = typer.Option(DEFAULT_BIZ_SUMMARY, "--biz"),
     name: str = typer.Option(None, "--name"),
     headless: bool = typer.Option(False, "--headless"),
+    site: str = typer.Option(
+        None, "--site", help="Target website hostname (e.g. webwaala.com). Overrides .env QA_PREVIEW_URL."
+    ),
+    preview_url: str = typer.Option(
+        None, "--preview-url", help="Full preview URL override; trumps --site."
+    ),
+    url_pattern: str = typer.Option(
+        "preview_id", "--url-pattern", help="URL shape: preview_id (/preview?id=) or preview_query (/?preview=)."
+    ),
 ) -> None:
     setup_logging()
+    s = get_settings()
+    resolved_preview = preview_url or (
+        build_preview_url(s.qa_base_url, site, pattern=url_pattern) if site else None
+    )
+    site_override = site if (site and s.qa_site_id == "qa-judge") else None
 
     seed = ScenarioSeed(
         persona=persona,
@@ -79,6 +94,8 @@ def main(
             script_to_scripted_turns(script),
             out_dir=out_dir,
             headless=headless,
+            preview_url=resolved_preview,
+            site_id_override=site_override,
         )
         logger.info("=" * 70)
         for m in artifacts.qa_messages:
