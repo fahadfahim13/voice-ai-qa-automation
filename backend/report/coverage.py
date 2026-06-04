@@ -45,8 +45,8 @@ def compute_coverage(results: Iterable[CallResult]) -> dict[str, dict[str, dict]
                 b["score_sum"] += float(v["overall_score"])
                 b["score_n"] += 1
     # Finalize avg_score and drop accumulators.
-    for axis, values in buckets.items():
-        for v_name, b in values.items():
+    for _axis, values in buckets.items():
+        for _v_name, b in values.items():
             avg = (b["score_sum"] / b["score_n"]) if b["score_n"] else 0.0
             b["avg_score"] = round(avg, 3)
             del b["score_sum"]
@@ -55,7 +55,7 @@ def compute_coverage(results: Iterable[CallResult]) -> dict[str, dict[str, dict]
 
 
 def compute_failure_breakdown(results: Iterable[CallResult]) -> list[dict]:
-    """One row per (failing criterion × failing call). Sorted by criterion then scenario."""
+    """One row per (failing criterion x failing call). Sorted by criterion then scenario."""
     rows: list[dict] = []
     for r in results:
         v = r.text_verdict
