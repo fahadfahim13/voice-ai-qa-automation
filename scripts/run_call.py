@@ -55,7 +55,8 @@ def main(
     resolved_preview = preview_url or (
         build_preview_url(s.qa_base_url, site, pattern=url_pattern) if site else None
     )
-    site_override = site if (site and s.qa_site_id == "qa-judge") else None
+    # Target the chosen siteId for transcript lookup regardless of the .env default.
+    site_override = site or None
 
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     label = f"{ts}_{name}" if name else ts
