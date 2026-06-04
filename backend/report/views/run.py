@@ -1,9 +1,10 @@
-"""Run suite page (C5): start a run from the dashboard and watch it live.
+"""Run suite page (C5, use case 4d): trigger the QA agent from the dashboard.
 
-Starts a background job via the C2 job_manager (subprocess — keeps Streamlit
-responsive), polls its status across reruns, and renders the full report +
-per-call details inline when the run finishes. Supports both keyless dry-runs and
-real runs.
+A form selects scenarios (all / by intent / specific), a target siteId, and run
+flags, then launches a background job via the C2 job_manager (subprocess — keeps
+Streamlit responsive). Live status is shown with a Refresh button (plus light
+auto-poll while running); on completion the full report renders inline and a link
+to the run on the Reports page is offered.
 """
 
 from __future__ import annotations
@@ -17,16 +18,18 @@ import streamlit as st  # type: ignore
 from backend.orchestrator import job_manager
 from backend.report import data
 from backend.report.aggregate import per_criterion_averages
-from backend.report.run_controls import (
+from backend.report.run_form import (
+    MODE_BY_INTENT,
+    MODE_SPECIFIC,
     MODES,
-    build_start_kwargs,
+    form_to_job_kwargs,
     status_badge,
 )
 from backend.report.views.call_detail import render_call
 from backend.scenarios import load_library
 from backend.settings import get_settings
 
-SESSION_KEY = "run_suite_job_id"
+SESSION_KEY = "run_job_id"
 
 
 def _render_results(suite_dir: str) -> None:
@@ -46,6 +49,15 @@ def _render_results(suite_dir: str) -> None:
         f"version {suite.get('suite_version', '—')}"
     )
 
+    # Link to the run on the Reports page (graceful fallback if page_link rejects).
+    try:
+        st.page_link("reports", label="📄 Open this run on the Reports page", icon="📄")
+    except Exception:
+        st.caption(
+            f"📄 Also on the **Reports** page under version "
+            f"`{suite.get('suite_version', 'unversioned')}` (suite `{Path(suite_dir).name}`)."
+        )
+
     averages = per_criterion_averages(suite)
     if averages:
         st.markdown("**Per-criterion averages**")
@@ -64,42 +76,49 @@ def _render_results(suite_dir: str) -> None:
 def _config_form() -> None:
     scenarios = load_library()
     all_ids = [s.id for s in scenarios]
+    intents = sorted({s.intent.value for s in scenarios})
 
     with st.form("run_cfg"):
-        dry_run = st.checkbox("Dry run (keyless, instant, 0 calls)", value=True)
-        mode = st.radio("Scenarios", MODES, horizontal=True)
-        max_n = st.number_input(
-            "First N", min_value=1, max_value=max(1, len(all_ids)), value=min(3, len(all_ids))
-        )
-        chosen_ids = st.multiselect("Specific ids", all_ids)
+        dry_run = st.checkbox("Dry run (keyless debug — instant, 0 calls)", value=True)
+        mode = st.radio("Scenario selection", MODES, horizontal=True)
+        intent = st.selectbox("Intent", intents) if intents else None
+        chosen_ids = st.multiselect("Specific scenario ids", all_ids)
+        site_id = st.text_input("siteId", value=get_settings().qa_site_id)
         suite_version = st.text_input("Suite version", value="v1.0")
         cols = st.columns(3)
         headless = cols[0].checkbox("Headless", value=True)
         audio_judge = cols[1].checkbox("Audio judge", value=False)
-        site = st.text_input("Target site (optional)", value="")
+        max_n = st.number_input("Max scenarios (0 = no limit)", min_value=0, value=0)
         submitted = st.form_submit_button("▶ Start run")
 
     if submitted:
-        kwargs = build_start_kwargs(
-            dry_run=dry_run,
-            mode=mode,
-            max_n=int(max_n),
-            ids=chosen_ids,
-            suite_version=suite_version,
-            headless=headless,
-            audio_judge=audio_judge,
-            site=site,
-        )
+        selection = {
+            "mode": mode,
+            "intent": intent,
+            "ids": chosen_ids,
+            "site_id": site_id,
+            "suite_version": suite_version,
+            "headless": headless,
+            "audio_judge": audio_judge,
+            "max_n": int(max_n) or None,
+        }
+        kwargs = form_to_job_kwargs(selection, scenarios=scenarios)
+        if mode == MODE_BY_INTENT and not kwargs["ids"]:
+            st.warning(f"No scenarios found for intent {intent!r}.")
+            return
+        if mode == MODE_SPECIFIC and not kwargs["ids"]:
+            st.warning("Pick at least one scenario id.")
+            return
         if not dry_run and not get_settings().openrouter_api_key:
             st.warning("OPENROUTER_API_KEY is not set — a real run will likely fail. Use dry run.")
-        job_id = job_manager.start_job(**kwargs)
+        job_id = job_manager.start_job(**kwargs, dry_run=dry_run)
         st.session_state[SESSION_KEY] = job_id
         st.rerun()
 
 
 def render() -> None:
     st.title("Run suite")
-    st.caption("Start a run and watch it live; the full report appears here when it finishes.")
+    st.caption("Trigger the QA agent and watch it live; the report appears here when it finishes.")
 
     _config_form()
 
@@ -112,7 +131,9 @@ def render() -> None:
     job_ids = [j["id"] for j in jobs]
     active = st.session_state.get(SESSION_KEY)
     default_idx = job_ids.index(active) if active in job_ids else 0
-    selected = st.selectbox("Job", job_ids, index=default_idx)
+    sel_col, btn_col = st.columns([4, 1])
+    selected = sel_col.selectbox("Job", job_ids, index=default_idx)
+    refresh = btn_col.button("🔄 Refresh")
 
     job = job_manager.get_job(selected)
     if not job:
@@ -125,7 +146,9 @@ def render() -> None:
     if job["status"] in ("queued", "running"):
         with st.expander("Live log", expanded=True):
             st.code(job_manager.tail_log(selected, 40) or "(starting…)")
-        time.sleep(2)
+        # light auto-poll for a live feel; the Refresh button also reruns
+        if not refresh:
+            time.sleep(2)
         st.rerun()
     elif job["status"] == "error":
         st.error(job.get("error") or "Run failed.")
