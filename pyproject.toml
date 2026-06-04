@@ -69,4 +69,5 @@ testpaths = ["tests"]
 markers = [
     "live: hits live BizFinder QA Read API (network + secret required)",
     "browser: spawns a real Chromium via Playwright",
+    "slow: long-running end-to-end test (real suite run, minutes)",
 ]

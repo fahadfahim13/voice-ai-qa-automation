@@ -95,7 +95,8 @@ def main(
     resolved_preview = preview_url or (
         build_preview_url(s.qa_base_url, site, pattern=url_pattern) if site else None
     )
-    site_override = site if (site and s.qa_site_id == "qa-judge") else None
+    # Target the chosen siteId for transcript lookup regardless of the .env default.
+    site_override = site or None
 
     asyncio.run(
         run_suite(

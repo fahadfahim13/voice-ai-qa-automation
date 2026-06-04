@@ -25,11 +25,21 @@ from backend.report.run_form import (
     form_to_job_kwargs,
     status_badge,
 )
+from backend.report.site_targeting import (
+    KNOWN_SITE_IDS,
+    admin_scan_available,
+    recent_site_ids,
+    remember_site_id,
+    url_to_site_id,
+    validate_site_id,
+)
 from backend.report.views.call_detail import render_call
 from backend.scenarios import load_library
 from backend.settings import get_settings
 
 SESSION_KEY = "run_job_id"
+TARGET_KEY = "run_target_site_id"
+CUSTOM = "Custom…"
 
 
 def _render_results(suite_dir: str) -> None:
@@ -73,17 +83,61 @@ def _render_results(suite_dir: str) -> None:
             render_call(c)
 
 
-def _config_form() -> None:
+def _site_id_picker() -> str:
+    """Choose + validate the target siteId (outside the form, needs reruns)."""
+    st.markdown("### Target siteId")
+    options = [*dict.fromkeys([*KNOWN_SITE_IDS, *recent_site_ids()]), CUSTOM]
+    default = st.session_state.get(TARGET_KEY, get_settings().qa_site_id)
+    idx = options.index(default) if default in options else 0
+    choice = st.selectbox("siteId", options, index=idx)
+    site_id = st.text_input("Custom siteId", value=default) if choice == CUSTOM else choice
+
+    cols = st.columns([1, 4])
+    if cols[0].button("🔎 Validate"):
+        st.session_state["siteid_check"] = validate_site_id(site_id)
+    check = st.session_state.get("siteid_check")
+    if check:
+        status = check.get("status")
+        if status == "known":
+            cols[1].success(f"Known siteId — {check.get('count', 0)}+ conversation(s).")
+        elif status == "no_traffic":
+            cols[1].info("Reachable, no traffic yet — will be created on the first call.")
+        elif status == "empty":
+            cols[1].warning("Enter a siteId.")
+        else:
+            cols[1].error(f"Unreachable: {check.get('error', 'unknown error')}")
+
+    # Stretch: arbitrary URL → siteId (guarded by an admin token).
+    if admin_scan_available():
+        with st.expander("Resolve a website URL → siteId (admin)"):
+            url = st.text_input("Website URL")
+            if st.button("Resolve URL") and url:
+                res = url_to_site_id(url)
+                if res.get("site_id"):
+                    site_id = res["site_id"]
+                    st.session_state[TARGET_KEY] = site_id
+                    st.success(f"Resolved → {site_id}")
+                else:
+                    st.error(res.get("error", "scan failed"))
+    else:
+        st.caption("URL scan needs admin access (set `BIZFINDER_ADMIN_TOKEN`).")
+
+    st.session_state[TARGET_KEY] = site_id
+    return site_id
+
+
+def _config_form(target_site_id: str) -> None:
     scenarios = load_library()
     all_ids = [s.id for s in scenarios]
     intents = sorted({s.intent.value for s in scenarios})
 
     with st.form("run_cfg"):
+        st.caption(f"Targeting siteId: **{target_site_id or '—'}**")
         dry_run = st.checkbox("Dry run (keyless debug — instant, 0 calls)", value=True)
         mode = st.radio("Scenario selection", MODES, horizontal=True)
         intent = st.selectbox("Intent", intents) if intents else None
         chosen_ids = st.multiselect("Specific scenario ids", all_ids)
-        site_id = st.text_input("siteId", value=get_settings().qa_site_id)
+        site_id = target_site_id
         suite_version = st.text_input("Suite version", value="v1.0")
         cols = st.columns(3)
         headless = cols[0].checkbox("Headless", value=True)
@@ -111,6 +165,7 @@ def _config_form() -> None:
             return
         if not dry_run and not get_settings().openrouter_api_key:
             st.warning("OPENROUTER_API_KEY is not set — a real run will likely fail. Use dry run.")
+        remember_site_id(site_id)
         job_id = job_manager.start_job(**kwargs, dry_run=dry_run)
         st.session_state[SESSION_KEY] = job_id
         st.rerun()
@@ -120,7 +175,8 @@ def render() -> None:
     st.title("Run suite")
     st.caption("Trigger the QA agent and watch it live; the report appears here when it finishes.")
 
-    _config_form()
+    target_site_id = _site_id_picker()
+    _config_form(target_site_id)
 
     jobs = job_manager.list_jobs()
     if not jobs:
