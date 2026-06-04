@@ -58,6 +58,9 @@ def load_suite(suite_dir: Path) -> dict:
     data.setdefault("n_errors", 0)
     data.setdefault("avg_overall_score", 0.0)
     data.setdefault("calls", [])
+    data.setdefault("suite_version", "unversioned")
+    data.setdefault("scenario_set_hash", "")
+    data.setdefault("provider_snapshot", {})
     return data
 
 

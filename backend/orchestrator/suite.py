@@ -19,6 +19,7 @@ from backend.caller import (
 from backend.judge import AudioVerdict, JudgeVerdict, judge_audio, judge_call
 from backend.openrouter import OpenRouterClient
 from backend.orchestrator.call_runner import run_call
+from backend.orchestrator.versioning import provider_snapshot, scenario_set_hash
 from backend.scenarios import Scenario
 from backend.settings import get_settings
 
@@ -61,6 +62,9 @@ class SuiteResult:
     calls: list[CallResult] = field(default_factory=list)
     coverage_by_axis: dict = field(default_factory=dict)
     failure_breakdown: list = field(default_factory=list)
+    suite_version: str = "v1.0"
+    scenario_set_hash: str = ""
+    provider_snapshot: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -161,6 +165,7 @@ async def run_suite(
     concurrency: int = 1,
     preview_url: str | None = None,
     site_id_override: str | None = None,
+    suite_version: str = "v1.0",
 ) -> SuiteResult:
     """Run a list of scenarios sequentially (default) or with a small concurrency.
 
@@ -237,6 +242,9 @@ async def run_suite(
         calls=results,
         coverage_by_axis=compute_coverage(results),
         failure_breakdown=compute_failure_breakdown(results),
+        suite_version=suite_version,
+        scenario_set_hash=scenario_set_hash(scenario_list),
+        provider_snapshot=provider_snapshot(),
     )
     (suite_dir / "suite.json").write_text(
         json.dumps(suite.to_dict(), indent=2, default=str), encoding="utf-8"
