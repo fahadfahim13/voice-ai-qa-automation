@@ -12,7 +12,7 @@ from __future__ import annotations
 import streamlit as st  # type: ignore
 
 from backend.report import data
-from backend.report.views import overview, placeholders
+from backend.report.views import overview, placeholders, reports
 
 
 def _render_health_badge() -> None:
@@ -29,11 +29,11 @@ def main() -> None:
     _render_health_badge()
 
     pages = [
-        st.Page(overview.render, title="Overview", icon="📊", default=True),
-        st.Page(placeholders.render_reports, title="Reports", icon="📄"),
-        st.Page(placeholders.render_scenarios, title="Scenarios", icon="🧪"),
-        st.Page(placeholders.render_run_suite, title="Run suite", icon="▶️"),
-        st.Page(placeholders.render_rerun, title="Re-run", icon="🔁"),
+        st.Page(overview.render, title="Overview", icon="📊", url_path="overview", default=True),
+        st.Page(reports.render, title="Reports", icon="📄", url_path="reports"),
+        st.Page(placeholders.render_scenarios, title="Scenarios", icon="🧪", url_path="scenarios"),
+        st.Page(placeholders.render_run_suite, title="Run suite", icon="▶️", url_path="run-suite"),
+        st.Page(placeholders.render_rerun, title="Re-run", icon="🔁", url_path="re-run"),
     ]
     st.navigation(pages).run()
 
