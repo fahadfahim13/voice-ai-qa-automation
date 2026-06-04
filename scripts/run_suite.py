@@ -49,6 +49,9 @@ def main(
     url_pattern: str = typer.Option(
         "preview_id", "--url-pattern", help="URL shape: preview_id (/preview?id=) or preview_query (/?preview=)."
     ),
+    suite_version: str = typer.Option(
+        "v1.0", "--suite-version", help="Version tag stamped into suite.json for grouping/pinning."
+    ),
 ) -> None:
     setup_logging()
     s = get_settings()
@@ -75,6 +78,7 @@ def main(
             concurrency=concurrency,
             preview_url=resolved_preview,
             site_id_override=site_override,
+            suite_version=suite_version,
         )
     )
     suite_dir = Path(s.harness_reports_dir)
