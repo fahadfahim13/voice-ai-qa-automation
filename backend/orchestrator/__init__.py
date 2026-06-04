@@ -3,7 +3,12 @@ from backend.orchestrator.call_runner import (
     ScriptedTurn,
     run_call,
 )
-from backend.orchestrator.suite import CallResult, SuiteResult, run_suite
+from backend.orchestrator.suite import (
+    CallResult,
+    SuiteResult,
+    run_suite,
+    write_dry_run_suite,
+)
 
 __all__ = [
     "CallArtifacts",
@@ -12,4 +17,5 @@ __all__ = [
     "SuiteResult",
     "run_call",
     "run_suite",
+    "write_dry_run_suite",
 ]
