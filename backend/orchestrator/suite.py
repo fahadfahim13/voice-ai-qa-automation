@@ -255,3 +255,44 @@ async def run_suite(
         suite.n_total, suite.n_passed, suite.n_failed, suite.n_errors, suite.avg_overall_score,
     )
     return suite
+
+
+def write_dry_run_suite(
+    scenarios: Iterable[Scenario],
+    *,
+    business_summary: str,
+    suite_dir: Path,
+    suite_version: str = "v1.0",
+) -> SuiteResult:
+    """Write a valid 0-call suite.json without any browser/LLM work.
+
+    Used by ``--dry-run`` so the background-job pipeline can be exercised with no
+    API keys and no Chromium. The result still carries the C1 versioning fields so
+    downstream consumers (data layer, reporting) see a well-formed suite.
+    """
+    from backend.report.coverage import compute_coverage, compute_failure_breakdown
+
+    scenario_list = list(scenarios)
+    suite_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(UTC).isoformat()
+    suite = SuiteResult(
+        started_at=now,
+        finished_at=now,
+        business_summary=business_summary,
+        n_total=0,
+        n_passed=0,
+        n_failed=0,
+        n_errors=0,
+        avg_overall_score=0.0,
+        calls=[],
+        coverage_by_axis=compute_coverage([]),
+        failure_breakdown=compute_failure_breakdown([]),
+        suite_version=suite_version,
+        scenario_set_hash=scenario_set_hash(scenario_list),
+        provider_snapshot=provider_snapshot(),
+    )
+    (suite_dir / "suite.json").write_text(
+        json.dumps(suite.to_dict(), indent=2, default=str), encoding="utf-8"
+    )
+    logger.info("Dry-run suite written: {} ({} scenarios hashed)", suite_dir, len(scenario_list))
+    return suite

@@ -10,13 +10,14 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 from loguru import logger
 
 from backend.logging import setup_logging
-from backend.orchestrator import run_suite
+from backend.orchestrator import run_suite, write_dry_run_suite
 from backend.report import write_report
 from backend.scenarios import load_library
 from backend.settings import get_settings
@@ -52,17 +53,44 @@ def main(
     suite_version: str = typer.Option(
         "v1.0", "--suite-version", help="Version tag stamped into suite.json for grouping/pinning."
     ),
+    suite_dir: str = typer.Option(
+        None, "--suite-dir", help="Explicit output dir for this suite (no 'find latest' race)."
+    ),
+    ids: str = typer.Option(
+        None, "--ids", help="Comma-separated scenario ids to run (superset of --only)."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Skip browser/LLM; write a valid 0-call suite.json and exit 0."
+    ),
 ) -> None:
     setup_logging()
     s = get_settings()
     scenarios = load_library()
-    if only:
+    if ids:
+        wanted = {i.strip() for i in ids.split(",") if i.strip()}
+        scenarios = [sc for sc in scenarios if sc.id in wanted]
+        missing = wanted - {sc.id for sc in scenarios}
+        if missing:
+            raise typer.BadParameter(f"No scenario(s) with id: {', '.join(sorted(missing))}")
+    elif only:
         scenarios = [sc for sc in scenarios if sc.id == only]
         if not scenarios:
             raise typer.BadParameter(f"No scenario with id {only!r}")
     elif max_n:
         scenarios = scenarios[:max_n]
     logger.info("Running {} scenarios", len(scenarios))
+
+    out_dir = Path(suite_dir) if suite_dir else None
+
+    if dry_run:
+        target = out_dir or (
+            s.harness_reports_dir / f"suite_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+        )
+        write_dry_run_suite(
+            scenarios, business_summary=biz, suite_dir=target, suite_version=suite_version
+        )
+        logger.success("Dry-run complete: {}", target / "suite.json")
+        return
 
     resolved_preview = preview_url or (
         build_preview_url(s.qa_base_url, site, pattern=url_pattern) if site else None
@@ -73,6 +101,7 @@ def main(
         run_suite(
             scenarios,
             business_summary=biz,
+            suite_dir=out_dir,
             headless=headless,
             do_audio_judge=audio_judge,
             concurrency=concurrency,
@@ -81,11 +110,18 @@ def main(
             suite_version=suite_version,
         )
     )
-    suite_dir = Path(s.harness_reports_dir)
-    # The suite created its own subdir; find the latest one with a suite.json
-    candidates = sorted(suite_dir.glob("suite_*"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if candidates:
-        html_path, pdf_path = write_report(candidates[0])
+    # Use the explicit suite dir if given; otherwise find the latest one.
+    if out_dir is not None:
+        report_target = out_dir
+    else:
+        candidates = sorted(
+            Path(s.harness_reports_dir).glob("suite_*"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        report_target = candidates[0] if candidates else None
+    if report_target is not None:
+        html_path, pdf_path = write_report(report_target)
         logger.info("HTML report: {}", html_path)
         if pdf_path:
             logger.info("PDF report : {}", pdf_path)
