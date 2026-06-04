@@ -9,11 +9,6 @@ from __future__ import annotations
 import streamlit as st  # type: ignore
 
 
-def render_scenarios() -> None:
-    st.title("Scenarios")
-    st.info("Coming in card C4.")
-
-
 def render_run_suite() -> None:
     st.title("Run suite")
     st.info("Coming in cards C5/C6.")
