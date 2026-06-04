@@ -20,7 +20,9 @@ def render() -> None:
         st.warning("No suites yet. Run `uv run python -m scripts.run_suite` first.")
         return
 
-    suite_label = st.sidebar.selectbox("Suite", [p.name for p in suites])
+    # Suite picker in the main page body (sized so the full suite name shows).
+    picker_col, _ = st.columns([3, 2])
+    suite_label = picker_col.selectbox("Suite", [p.name for p in suites])
     suite_dir = next(p for p in suites if p.name == suite_label)
     suite = data.load_suite(suite_dir)
     if not suite:
