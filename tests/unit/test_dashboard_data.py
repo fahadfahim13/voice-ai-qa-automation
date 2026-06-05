@@ -27,6 +27,19 @@ def test_list_suites_missing_dir(tmp_path, monkeypatch):
     assert data.list_suites() == []
 
 
+def test_suite_label_with_timestamp_and_id():
+    assert data.suite_label("suite_20260604T145443Z_45fad09c") == "2026-06-04 14:54 · 45fad09c"
+
+
+def test_suite_label_timestamp_only():
+    assert data.suite_label("suite_20260601T000000Z") == "2026-06-01 00:00"
+
+
+def test_suite_label_unparseable_falls_back_to_raw():
+    assert data.suite_label("not_a_suite") == "not_a_suite"
+    assert data.suite_label("suite_garbage_abc") == "suite_garbage_abc"
+
+
 def test_list_loaded_suites_skips_incomplete_and_unreadable(tmp_path, monkeypatch):
     # A finished suite (has suite.json).
     good = tmp_path / "suite_20260601T000000Z"

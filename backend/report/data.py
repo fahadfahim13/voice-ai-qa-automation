@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
 
 from backend.qa_api.client import QaApiClient
@@ -31,6 +32,23 @@ def list_suites() -> list[Path]:
         key=lambda p: p.name,
         reverse=True,
     )
+
+
+def suite_label(name: str) -> str:
+    """Human-friendly label for a suite dir name.
+
+    ``suite_20260604T145443Z_45fad09c`` -> ``2026-06-04 14:54 · 45fad09c``.
+    Falls back to the raw name when it doesn't match the expected shape, so the
+    picker never breaks on an unexpected folder.
+    """
+    body = name[len("suite_"):] if name.startswith("suite_") else name
+    ts_part, _, short_id = body.partition("_")
+    try:
+        ts = datetime.strptime(ts_part, "%Y%m%dT%H%M%SZ")
+    except ValueError:
+        return name
+    label = ts.strftime("%Y-%m-%d %H:%M")
+    return f"{label} · {short_id}" if short_id else label
 
 
 def list_loaded_suites() -> list[tuple[Path, dict]]:

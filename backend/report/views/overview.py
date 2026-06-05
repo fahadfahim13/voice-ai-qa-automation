@@ -44,9 +44,9 @@ def render() -> None:
 
     # Suite picker in the main page body (sized so the full suite name shows).
     picker_col, _ = st.columns([3, 2])
-    by_name = {p.name: s for p, s in loaded}
-    suite_label = picker_col.selectbox("Suite", list(by_name.keys()))
-    suite = by_name[suite_label]
+    by_label = {data.suite_label(p.name): s for p, s in loaded}
+    choice = picker_col.selectbox("Suite", list(by_label.keys()))
+    suite = by_label[choice]
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Total", suite["n_total"])
