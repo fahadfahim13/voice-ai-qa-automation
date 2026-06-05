@@ -7,9 +7,17 @@ from backend.report.run_form import (
     MODE_BY_INTENT,
     MODE_SPECIFIC,
     form_to_job_kwargs,
+    is_dry_run,
     status_badge,
 )
 from backend.scenarios import load_library
+
+
+def test_is_dry_run():
+    assert is_dry_run(["python", "-m", "scripts.run_suite", "--dry-run", "--headless"]) is True
+    assert is_dry_run(["python", "-m", "scripts.run_suite", "--headless", "--max", "1"]) is False
+    assert is_dry_run(None) is False
+    assert is_dry_run([]) is False
 
 
 def _sel(**over):
