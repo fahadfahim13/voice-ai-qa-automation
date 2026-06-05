@@ -12,7 +12,7 @@ from __future__ import annotations
 import streamlit as st  # type: ignore
 
 from backend.report import data
-from backend.report.auth import require_password
+from backend.report.auth import require_auth
 from backend.report.views import overview, reports, rerun_page, run, scenarios
 
 
@@ -27,7 +27,7 @@ def _render_health_badge() -> None:
 def main() -> None:
     st.set_page_config(page_title="BizFinder Voice QA", layout="wide")
 
-    require_password()  # gate the whole app before anything else renders
+    require_auth()  # per-user login gate (renders login form + owns sidebar user/logout)
 
     _render_health_badge()
 
