@@ -81,7 +81,13 @@ Operator dashboard (Streamlit, multipage). Architecture + how to extend it:
 
 ```powershell
 uv run --extra report streamlit run backend/report/dashboard.py
+# or, for a guaranteed-clean restart (kills stale Streamlit processes first):
+pwsh scripts/run_dashboard.ps1            # optional: -Port 8502
 ```
+
+> `streamlit run` spawns a parent + app child; killing only the port listener
+> can leave a stale process serving old code after edits. `run_dashboard.ps1`
+> stops them all and launches one fresh instance.
 
 **Pages:** Overview (suite picker + headline metrics + in-UI smoke test),
 Reports (runs grouped by version + re-run a pinned version), Scenarios (library),
