@@ -97,9 +97,7 @@ def render() -> None:
     st.title("Reports")
     st.caption("Past runs grouped by suite version (4a). Re-run a version's pinned set (4b).")
 
-    suite_dirs = data.list_suites()
-    loaded = [(p, data.load_suite(p)) for p in suite_dirs]
-    loaded = [(p, s) for p, s in loaded if s]  # drop unreadable/empty
+    loaded = data.list_loaded_suites()  # (dir, suite) for readable suites, newest first
     if not loaded:
         st.info("No suites yet. Run a suite first (Run suite page, or `scripts.run_suite`).")
         return

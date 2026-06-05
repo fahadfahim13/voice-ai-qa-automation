@@ -34,19 +34,19 @@ def render() -> None:
 
     _render_smoke()
 
-    suites = data.list_suites()
-    if not suites:
-        st.warning("No suites yet. Run `uv run python -m scripts.run_suite` first.")
+    loaded = data.list_loaded_suites()  # skips in-progress / unreadable suite dirs
+    if not loaded:
+        if data.list_suites():
+            st.info("Latest run is still in progress (no suite.json yet) — refresh shortly.")
+        else:
+            st.warning("No suites yet. Run `uv run python -m scripts.run_suite` first.")
         return
 
     # Suite picker in the main page body (sized so the full suite name shows).
     picker_col, _ = st.columns([3, 2])
-    suite_label = picker_col.selectbox("Suite", [p.name for p in suites])
-    suite_dir = next(p for p in suites if p.name == suite_label)
-    suite = data.load_suite(suite_dir)
-    if not suite:
-        st.error(f"No suite.json in {suite_dir}")
-        return
+    by_name = {p.name: s for p, s in loaded}
+    suite_label = picker_col.selectbox("Suite", list(by_name.keys()))
+    suite = by_name[suite_label]
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Total", suite["n_total"])

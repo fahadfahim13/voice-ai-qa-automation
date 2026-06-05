@@ -33,6 +33,16 @@ def list_suites() -> list[Path]:
     )
 
 
+def list_loaded_suites() -> list[tuple[Path, dict]]:
+    """``(dir, suite_dict)`` for every suite with a readable ``suite.json``.
+
+    Newest first. Directories without a readable ``suite.json`` — e.g. a run still
+    in progress (the dir is created before ``suite.json`` is written) or an aborted
+    run — are skipped, so callers never see a half-written suite.
+    """
+    return [(p, s) for p in list_suites() if (s := load_suite(p))]
+
+
 def load_suite(suite_dir: Path) -> dict:
     """Parse ``suite.json`` from a suite dir, tolerant of missing keys.
 
