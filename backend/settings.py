@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     qa_preview_url_pattern: Literal["preview_id", "preview_query"] = "preview_id"
     qa_rate_limit_rps: float = 1.0
 
+    # Dashboard auth gate (C8). Empty = open with a warning (local-use only).
+    dashboard_password: str = ""
+
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model_caller: str = "deepseek/deepseek-chat"
