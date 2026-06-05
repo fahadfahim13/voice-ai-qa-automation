@@ -21,6 +21,8 @@ recordings/
 reports/
 *.db          # SQLite (auth/user DB); reports/qa.db already covered by reports/
 .qa.env
+# local authored methodology doc, kept out of the repo
+qa-methodology.html
 *.wav
 *.mp3
 !tests/fixtures/**/*.wav
