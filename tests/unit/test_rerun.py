@@ -25,6 +25,25 @@ def _call(scenario_id, scores):
     }
 
 
+def test_scenario_ids_of_dedup_and_order():
+    suite = {
+        "calls": [
+            {"scenario_id": "a"},
+            {"scenario_id": "b"},
+            {"scenario_id": "a"},
+            {"scenario_id": "c"},
+            {"scenario_id": None},  # ignored
+            {},                      # ignored
+        ]
+    }
+    assert rerun.scenario_ids_of(suite) == ["a", "b", "c"]
+
+
+def test_scenario_ids_of_empty():
+    assert rerun.scenario_ids_of({"calls": []}) == []
+    assert rerun.scenario_ids_of({}) == []
+
+
 def test_pinned_ids_from_latest_of_version_ignores_others():
     suites = [
         _suite("v1.0", "2026-06-01T10:00:00Z", scenario_ids=["a", "b"]),
