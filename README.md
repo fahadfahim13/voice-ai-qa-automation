@@ -74,6 +74,32 @@ uv run python -m scripts.run_suite --max 5 --headless
 uv run --extra report streamlit run backend/report/dashboard.py
 ```
 
+## Dashboard
+
+Operator dashboard (Streamlit, multipage). Architecture + how to extend it:
+[docs/DASHBOARD.md](./docs/DASHBOARD.md).
+
+```powershell
+uv run --extra report streamlit run backend/report/dashboard.py
+```
+
+**Pages:** Overview (suite picker + headline metrics + in-UI smoke test),
+Reports (runs grouped by version + re-run a pinned version), Scenarios (library),
+Run suite (trigger a run + live status), Re-run.
+
+**Auth gate.** The whole app sits behind a shared password read from
+`DASHBOARD_PASSWORD`:
+- **set** → a password prompt gates every page (Coolify injects it on deploy).
+- **unset** → the app loads with a ⚠ "local use only" banner (local dev isn't blocked).
+
+**Smoke test.** Verify the QA Read API from the Overview page (**🩺 Run smoke
+test**) or the CLI — checks health, conversation list, and that a wrong secret is
+rejected (**AUTH GATE OK**):
+
+```powershell
+uv run python -m scripts.qa_smoke_test   # exits non-zero on failure
+```
+
 ## Status (Phase 1 — all 11 steps implemented)
 
 | Step | What | Status |

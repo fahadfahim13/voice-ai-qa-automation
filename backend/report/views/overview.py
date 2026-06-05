@@ -10,10 +10,29 @@ import streamlit as st  # type: ignore
 
 from backend.report import data
 from backend.report.views.call_detail import render_call
+from scripts.qa_smoke_test import run_smoke
+
+
+def _render_smoke() -> None:
+    """In-UI QA Read API smoke test (health + list + wrong-secret → 401)."""
+    with st.expander("🩺 QA API smoke test"):
+        if st.button("Run smoke test"):
+            st.session_state["smoke_result"] = run_smoke()
+        result = st.session_state.get("smoke_result")
+        if result is None:
+            st.caption("Checks health, conversation list, and that a wrong secret is rejected.")
+            return
+        (st.success if result.ok else st.error)(
+            "All checks green." if result.ok else f"{len(result.failures)} check(s) failed."
+        )
+        for c in result.checks:
+            st.write(f"{'✅' if c.ok else '❌'} **{c.name}** — {c.detail}")
 
 
 def render() -> None:
     st.title("BizFinder Voice QA — operator dashboard")
+
+    _render_smoke()
 
     suites = data.list_suites()
     if not suites:
