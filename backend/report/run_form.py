@@ -30,6 +30,15 @@ def status_badge(status: str) -> str:
     return _BADGES.get(status, f"⚪ {status}")
 
 
+def is_dry_run(argv: list[str] | None) -> bool:
+    """True when a job was launched as a dry run (``--dry-run`` in its argv).
+
+    Used by the Run page to explain a 0-call dry-run result instead of showing
+    bare ``Total 0`` metrics that read like a failure.
+    """
+    return "--dry-run" in (argv or [])
+
+
 def form_to_job_kwargs(selection: dict, scenarios: Iterable[Scenario] | None = None) -> dict:
     """Map the Run-suite form ``selection`` to ``start_job`` kwargs.
 

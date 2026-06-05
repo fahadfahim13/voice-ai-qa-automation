@@ -23,6 +23,7 @@ from backend.report.run_form import (
     MODE_SPECIFIC,
     MODES,
     form_to_job_kwargs,
+    is_dry_run,
     status_badge,
 )
 from backend.report.site_targeting import (
@@ -42,10 +43,24 @@ TARGET_KEY = "run_target_site_id"
 CUSTOM = "Custom…"
 
 
-def _render_results(suite_dir: str) -> None:
+def _render_results(suite_dir: str, *, dry_run: bool = False) -> None:
     suite = data.load_suite(Path(suite_dir))
     if not suite:
         st.warning("Run finished but no suite.json was found.")
+        return
+
+    if dry_run:
+        # A dry run is keyless and makes 0 calls by design — explain that instead
+        # of showing bare "Total 0" metrics that read like a failed run.
+        st.info(
+            "🧪 **Dry run** — the run pipeline was validated **without making any "
+            "calls**, so `Total 0` is expected (nothing was scored). The selected "
+            f"scenario set was fingerprinted (`{(suite.get('scenario_set_hash') or '—')[:12]}…`) "
+            f"under version `{suite.get('suite_version', '—')}`.\n\n"
+            "👉 **Uncheck “Dry run” and click Start run** for a real, scored run "
+            "(drives the live widget; needs API keys)."
+        )
+        st.caption(f"{suite['started_at']} → {suite['finished_at']}")
         return
 
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -211,5 +226,6 @@ def render() -> None:
         with st.expander("Log"):
             st.code(job_manager.tail_log(selected, 80) or "(no log)")
     else:  # done
-        st.success("Run complete.")
-        _render_results(job["suite_dir"])
+        dry = is_dry_run(job.get("argv"))
+        st.success("Dry run complete — no calls made (this is expected)." if dry else "Run complete.")
+        _render_results(job["suite_dir"], dry_run=dry)
