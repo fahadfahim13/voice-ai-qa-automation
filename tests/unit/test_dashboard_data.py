@@ -40,6 +40,26 @@ def test_suite_label_unparseable_falls_back_to_raw():
     assert data.suite_label("suite_garbage_abc") == "suite_garbage_abc"
 
 
+def test_list_loaded_suites_skips_incomplete_and_unreadable(tmp_path, monkeypatch):
+    # A finished suite (has suite.json).
+    good = tmp_path / "suite_20260601T000000Z"
+    good.mkdir()
+    (good / "suite.json").write_text(json.dumps({"n_total": 1}), encoding="utf-8")
+    # An in-progress run: dir exists, no suite.json yet.
+    (tmp_path / "suite_20260605T000000Z").mkdir()
+    # A corrupt suite.json.
+    bad = tmp_path / "suite_20260603T000000Z"
+    bad.mkdir()
+    (bad / "suite.json").write_text("{not json", encoding="utf-8")
+
+    monkeypatch.setattr(data, "_suites_dir", lambda: tmp_path)
+
+    loaded = data.list_loaded_suites()
+    # Only the readable suite is returned; in-progress and corrupt are skipped.
+    assert [p.name for p, _ in loaded] == ["suite_20260601T000000Z"]
+    assert loaded[0][1]["n_total"] == 1
+
+
 def test_load_suite_full(tmp_path):
     suite_dir = tmp_path / "suite_full"
     suite_dir.mkdir()
