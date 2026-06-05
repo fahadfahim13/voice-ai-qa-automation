@@ -8,11 +8,13 @@ the schema; migrations are a future step once the schema starts evolving.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.settings import get_settings
@@ -24,6 +26,14 @@ class Base(DeclarativeBase):
 
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None
+
+# Serialize schema creation: Streamlit re-runs ``main()`` (and thus ``init_db()``)
+# on every rerun across multiple server threads/sessions that share the cached
+# engine. Without this, two threads can both pass ``create_all``'s checkfirst and
+# race to ``CREATE TABLE`` the first time a new table is added — the loser raises
+# "table already exists".
+_init_lock = threading.Lock()
+_initialized = False
 
 
 def get_engine() -> Engine:
@@ -40,21 +50,37 @@ def get_engine() -> Engine:
 
 def reset_engine() -> None:
     """Dispose + forget the cached engine (tests point at a fresh DB)."""
-    global _engine, _SessionLocal
+    global _engine, _SessionLocal, _initialized
     if _engine is not None:
         _engine.dispose()
     _engine = None
     _SessionLocal = None
+    _initialized = False  # next init_db() must recreate schema on the new DB
 
 
 def init_db() -> None:
-    """Create the schema if missing (idempotent). Ensures the SQLite dir exists."""
+    """Create the schema if missing (idempotent + thread-safe).
+
+    Ensures the SQLite dir exists. Guarded by ``_init_lock`` so concurrent
+    Streamlit reruns don't race on ``create_all`` the first time a new table is
+    added; a benign "already exists" from a cross-process race is swallowed.
+    """
+    global _initialized
     from backend.db import models  # noqa: F401  — register mappers on Base
 
     url = get_settings().qa_db_url
     if url.startswith("sqlite:///"):
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(get_engine())
+
+    with _init_lock:
+        if _initialized:
+            return
+        try:
+            Base.metadata.create_all(get_engine())
+        except OperationalError as exc:  # lost a cross-process create race → already there
+            if "already exists" not in str(exc):
+                raise
+        _initialized = True
 
 
 @contextmanager
