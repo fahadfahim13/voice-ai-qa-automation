@@ -131,9 +131,21 @@ def _config_form(target_site_id: str) -> None:
     all_ids = [s.id for s in scenarios]
     intents = sorted({s.intent.value for s in scenarios})
 
+    run_full = "Full run — real calls + judging"
+    run_dry = "Dry run — skip the process (no calls)"
+
     with st.form("run_cfg"):
         st.caption(f"Targeting siteId: **{target_site_id or '—'}**")
-        dry_run = st.checkbox("Dry run (keyless debug — instant, 0 calls)", value=True)
+        run_mode = st.radio(
+            "Run mode",
+            [run_full, run_dry],
+            index=0,  # default to the full real run so a run actually runs the pipeline
+            captions=[
+                "Drives the live widget and scores each call. Needs API keys; takes minutes.",
+                "Validates the pipeline only — makes 0 calls and produces no scores.",
+            ],
+        )
+        dry_run = run_mode == run_dry
         mode = st.radio("Scenario selection", MODES, horizontal=True)
         intent = st.selectbox("Intent", intents) if intents else None
         chosen_ids = st.multiselect("Specific scenario ids", all_ids)
