@@ -1,8 +1,11 @@
-"""Unit tests for the C8 smoke evaluation and the auth-gate decision."""
+"""Unit tests for the C8 QA-API smoke evaluation.
+
+(Auth moved from a shared-password gate to per-user JWT auth in C9 —
+see ``tests/unit/test_auth.py``.)
+"""
 
 from __future__ import annotations
 
-from backend.report.auth import OPEN_NO_PASSWORD, evaluate_access
 from scripts.qa_smoke_test import evaluate_smoke
 
 
@@ -40,16 +43,3 @@ def test_smoke_list_down_fails():
 def test_smoke_health_200_but_not_ok_fails():
     res = evaluate_smoke(health_status=200, health_ok=False, list_status=200, wrong_secret_status=401)
     assert res.ok is False
-
-
-def test_access_correct_password():
-    assert evaluate_access("s3cret", "s3cret") is True
-
-
-def test_access_wrong_password():
-    assert evaluate_access("nope", "s3cret") is False
-
-
-def test_access_unset_password_returns_open_sentinel():
-    assert evaluate_access("anything", "") == OPEN_NO_PASSWORD
-    assert evaluate_access(None, "") == OPEN_NO_PASSWORD

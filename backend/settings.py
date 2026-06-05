@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     # Dashboard auth gate (C8). Empty = open with a warning (local-use only).
     dashboard_password: str = ""
 
+    # Per-user auth + DB (C9). Empty jwt_secret → ephemeral per-process key + a
+    # warning banner (tokens won't survive a restart). admin_* seeds the first user.
+    jwt_secret: str = ""
+    jwt_access_minutes: int = 720
+    qa_db_url: str = f"sqlite:///{(REPO_ROOT / 'reports' / 'qa.db').as_posix()}"
+    admin_email: str = ""
+    admin_password: str = ""
+
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model_caller: str = "deepseek/deepseek-chat"

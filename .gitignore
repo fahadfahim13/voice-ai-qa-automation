@@ -19,6 +19,7 @@ htmlcov/
 # Project
 recordings/
 reports/
+*.db          # SQLite (auth/user DB); reports/qa.db already covered by reports/
 .qa.env
 *.wav
 *.mp3

@@ -38,15 +38,16 @@ survives reruns. Nothing in the shared layer raises into the UI.
 
 ## Auth gate
 
-`backend/report/auth.py` — `require_password()` is called once at the top of
-`main()` (after `st.set_page_config`). It reads `DASHBOARD_PASSWORD` from
-settings:
-- **unset** → warning banner, app stays open (local use only).
-- **set** → password prompt; `st.stop()` until correct; the result is cached in
-  `st.session_state["dashboard_authed"]`.
-
-The decision logic is the pure `evaluate_access(entered, configured)` (unit-tested):
-correct → `True`, wrong → `False`, unset → `OPEN_NO_PASSWORD` sentinel.
+**Per-user accounts (C9).** `backend/report/auth.py::require_auth()` is called once
+at the top of `main()`. Standard stack — [PyJWT](https://pyjwt.readthedocs.io)
+HS256 tokens, [passlib](https://passlib.readthedocs.io) bcrypt hashing,
+[SQLAlchemy](https://docs.sqlalchemy.org) `users` table in SQLite
+(`backend/db/`). Users log in with email + password; a signed JWT is stored in a
+browser cookie (survives refresh) and validated on every page. `JWT_SECRET` unset →
+an ephemeral key + a warning banner (tokens won't survive a restart). Manage users
+with `scripts/manage_users.py` (`create-user` / `list-users` / `deactivate-user` /
+`reset-password`); `ADMIN_EMAIL`/`ADMIN_PASSWORD` seed the first user on first run.
+`require_password()` remains as a deprecated shim that calls `require_auth()`.
 
 ## Smoke test
 
@@ -72,7 +73,11 @@ Host on Coolify (extend Streamlit; no main-app JWT). Required env vars:
 | `QA_SHARED_SECRET` | QA Read API (`X-QA-Secret`) |
 | `OPENROUTER_API_KEY` | caller persona + judges (real runs) |
 | `OPENAI_API_KEY` | TTS/STT (real runs) |
-| `DASHBOARD_PASSWORD` | dashboard auth gate (set this in prod) |
+| `JWT_SECRET` | **set in prod** — long random string signing auth tokens (C9) |
+| `JWT_ACCESS_MINUTES` | token TTL (default `720` = 12h) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed the first dashboard user on first run |
+| `QA_DB_URL` | user DB (default `sqlite:///reports/qa.db`) |
+| `DASHBOARD_PASSWORD` | legacy C8 shared gate (superseded by per-user auth) |
 
 Run command: `uv run --extra report streamlit run backend/report/dashboard.py`.
 On boot, open the dashboard and click **🩺 Run smoke test** (Overview) to confirm
