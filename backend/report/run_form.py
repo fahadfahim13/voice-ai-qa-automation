@@ -43,7 +43,8 @@ def form_to_job_kwargs(selection: dict, scenarios: Iterable[Scenario] | None = N
     """Map the Run-suite form ``selection`` to ``start_job`` kwargs.
 
     ``selection`` keys: ``mode`` (All/By intent/Specific), ``intent``, ``ids``,
-    ``site_id``, ``suite_version``, ``headless``, ``audio_judge``, ``max_n``.
+    ``site_id``, ``website``, ``name``, ``suite_version``, ``headless``,
+    ``audio_judge``, ``max_n``.
 
     "By intent" resolves to the scenario ids of that intent from the library.
     ``dry_run`` is intentionally NOT included here — the caller passes it to
@@ -62,6 +63,8 @@ def form_to_job_kwargs(selection: dict, scenarios: Iterable[Scenario] | None = N
         "ids": ids,
         "max_n": selection.get("max_n") or None,
         "site_id": (selection.get("site_id") or "").strip() or None,
+        "website": (selection.get("website") or "").strip() or None,
+        "name": (selection.get("name") or "").strip() or None,
         "suite_version": (selection.get("suite_version") or "v1.0").strip() or "v1.0",
         "headless": bool(selection.get("headless", True)),
         "audio_judge": bool(selection.get("audio_judge", False)),
