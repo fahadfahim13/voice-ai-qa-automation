@@ -13,22 +13,35 @@ from __future__ import annotations
 from backend.report.aggregate import pass_rate, per_criterion_averages
 
 
-def _suites_for_version(version: str, suites: list[dict]) -> list[dict]:
-    """Suites of ``version``, newest first (by ``started_at`` ISO string)."""
+def _has_scenarios(suite: dict) -> bool:
+    """True when the suite recorded at least one ``scenario_id`` (not a dry-run)."""
+    return any(c.get("scenario_id") for c in suite.get("calls", []))
+
+
+def _suites_for_version(version: str, suites: list[dict], *, with_scenarios: bool = False) -> list[dict]:
+    """Suites of ``version``, newest first (by ``started_at`` ISO string).
+
+    With ``with_scenarios=True``, 0-call runs (e.g. dry-runs) are skipped so the
+    "pinned set" comes from the latest run that actually exercised scenarios.
+    """
     matching = [s for s in suites if (s.get("suite_version") or "") == version]
+    if with_scenarios:
+        matching = [s for s in matching if _has_scenarios(s)]
     return sorted(matching, key=lambda s: s.get("started_at") or "", reverse=True)
 
 
 def _latest_for_version(version: str, suites: list[dict]) -> dict | None:
-    matching = _suites_for_version(version, suites)
+    """Latest run of ``version`` that recorded scenarios (ignores dry-runs)."""
+    matching = _suites_for_version(version, suites, with_scenarios=True)
     return matching[0] if matching else None
 
 
 def pinned_scenario_ids(version: str, suites: list[dict]) -> list[str]:
-    """Scenario ids from the latest suite of ``version``.
+    """Scenario ids from the latest run of ``version`` that recorded scenarios.
 
-    De-duplicated, first-seen order preserved. Unknown version (or a run with no
-    recorded calls) → ``[]``. Never raises.
+    De-duplicated, first-seen order preserved. 0-call runs (dry-runs) are skipped,
+    so a recent dry-run can't blank out the pin. Unknown version (or no real run
+    of it) → ``[]``. Never raises.
     """
     latest = _latest_for_version(version, suites)
     if not latest:
@@ -42,10 +55,11 @@ def pinned_scenario_ids(version: str, suites: list[dict]) -> list[str]:
 
 
 def pinned_scenario_hash(version: str, suites: list[dict]) -> str | None:
-    """Recorded ``scenario_set_hash`` of the latest suite of ``version``.
+    """Recorded ``scenario_set_hash`` of the latest run of ``version`` with scenarios.
 
-    Lets the UI warn when the current library has drifted from what was pinned.
-    Returns ``None`` for an unknown version or a suite without the field.
+    Same suite that :func:`pinned_scenario_ids` pins, so the UI's drift warning
+    compares like for like. Returns ``None`` for an unknown version or a suite
+    without the field.
     """
     latest = _latest_for_version(version, suites)
     if not latest:
@@ -60,7 +74,7 @@ def version_delta(version: str, suites: list[dict]) -> dict | None:
     ``None`` when fewer than two runs of the version exist. Reuses the Reports
     aggregation helpers so the numbers match the rest of the page.
     """
-    matching = _suites_for_version(version, suites)
+    matching = _suites_for_version(version, suites, with_scenarios=True)
     if len(matching) < 2:
         return None
     new, prev = matching[0], matching[1]
