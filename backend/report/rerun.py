@@ -36,6 +36,15 @@ def _latest_for_version(version: str, suites: list[dict]) -> dict | None:
     return matching[0] if matching else None
 
 
+def scenario_ids_of(suite: dict) -> list[str]:
+    """De-duplicated ``scenario_id`` list a single suite ran (first-seen order).
+
+    Returns ``[]`` for a 0-call suite (e.g. a dry run). Never raises.
+    """
+    ids = [c.get("scenario_id") for c in suite.get("calls", []) if c.get("scenario_id")]
+    return list(dict.fromkeys(ids))
+
+
 def pinned_scenario_ids(version: str, suites: list[dict]) -> list[str]:
     """Scenario ids from the latest run of ``version`` that recorded scenarios.
 
@@ -44,14 +53,7 @@ def pinned_scenario_ids(version: str, suites: list[dict]) -> list[str]:
     of it) → ``[]``. Never raises.
     """
     latest = _latest_for_version(version, suites)
-    if not latest:
-        return []
-    ids = [
-        c.get("scenario_id")
-        for c in latest.get("calls", [])
-        if c.get("scenario_id")
-    ]
-    return list(dict.fromkeys(ids))
+    return scenario_ids_of(latest) if latest else []
 
 
 def pinned_scenario_hash(version: str, suites: list[dict]) -> str | None:
