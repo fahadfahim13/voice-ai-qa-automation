@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # warning banner (tokens won't survive a restart). admin_* seeds the first user.
     jwt_secret: str = ""
     jwt_access_minutes: int = 720
+    allow_signup: bool = True  # env ALLOW_SIGNUP — self-service registration page
     qa_db_url: str = f"sqlite:///{(REPO_ROOT / 'reports' / 'qa.db').as_posix()}"
     admin_email: str = ""
     admin_password: str = ""

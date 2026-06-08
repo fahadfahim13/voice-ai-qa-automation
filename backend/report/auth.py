@@ -33,6 +33,9 @@ _EPHEMERAL_SECRET = secrets.token_urlsafe(32)
 _TOKEN_KEY = "auth_token"
 _COOKIE_NAME = "qa_auth"
 
+MIN_PASSWORD_LEN = 8
+_VIEW_KEY = "auth_view"  # session flag: "login" | "signup"
+
 
 def _secret() -> str:
     return get_settings().jwt_secret or _EPHEMERAL_SECRET
@@ -93,6 +96,73 @@ def _authenticate(session, email: str, password: str) -> User | None:
     return None
 
 
+# --------------------------------------------------------------------------- #
+# self-service registration + profile (no Streamlit import — unit-testable)
+# --------------------------------------------------------------------------- #
+def register_user(
+    email: str, password: str, *, name: str | None = None, session=None
+) -> User | None:
+    """Create a new active user. Returns the ``User`` or ``None`` if the email is taken.
+
+    Caller is responsible for input validation (length, confirm, format); this
+    only enforces uniqueness of the (lower-cased) email.
+    """
+    email = (email or "").strip().lower()
+
+    def _do(s) -> User | None:
+        if s.scalars(select(User).where(User.email == email)).first():
+            return None
+        user = User(
+            email=email,
+            password_hash=hash_password(password),
+            name=(name or "").strip() or None,
+        )
+        s.add(user)
+        s.flush()  # populate user.id before the session closes
+        return user
+
+    if session is not None:
+        return _do(session)
+    with get_session() as s:
+        return _do(s)
+
+
+def change_password(
+    email: str, current_password: str, new_password: str, *, session=None
+) -> bool:
+    """Set a new password after verifying the current one. ``False`` if it doesn't match."""
+    email = (email or "").strip().lower()
+
+    def _do(s) -> bool:
+        user = s.scalars(select(User).where(User.email == email)).first()
+        if not user or not verify_password(current_password, user.password_hash):
+            return False
+        user.password_hash = hash_password(new_password)
+        return True
+
+    if session is not None:
+        return _do(session)
+    with get_session() as s:
+        return _do(s)
+
+
+def update_profile(email: str, *, name: str | None = None, session=None) -> User | None:
+    """Update editable profile fields (display name). Returns the user or ``None``."""
+    email = (email or "").strip().lower()
+
+    def _do(s) -> User | None:
+        user = s.scalars(select(User).where(User.email == email)).first()
+        if not user:
+            return None
+        user.name = (name or "").strip() or None
+        return user
+
+    if session is not None:
+        return _do(session)
+    with get_session() as s:
+        return _do(s)
+
+
 def _active_user(email: str | None) -> User | None:
     if not email:
         return None
@@ -143,15 +213,34 @@ def require_auth():
     if claims:
         user = _active_user(claims.get("sub"))
         if user:
-            st.sidebar.caption(f"Signed in as **{user.email}**")
+            # Persist the resolved token so downstream pages (e.g. Profile) can read it.
+            st.session_state[_TOKEN_KEY] = token
+            st.sidebar.caption(f"Signed in as **{user.name or user.email}**")
             if st.sidebar.button("Log out"):
                 st.session_state.pop(_TOKEN_KEY, None)
                 cm.delete(_COOKIE_NAME, key="qa_auth_del")
                 st.rerun()
             return user
 
-    # Not authenticated → login form.
-    st.title("🔐 BizFinder Voice QA — sign in")
+    # Not authenticated → login or signup (separate views, same look).
+    if st.session_state.get(_VIEW_KEY) == "signup" and get_settings().allow_signup:
+        _render_signup(st, cm)
+    else:
+        _render_login(st, cm)
+    st.stop()
+
+
+def _complete_login(st, cm, user: User) -> None:
+    """Issue a token, persist it (session + cookie), and rerun into the app."""
+    tok = create_access_token(user.email)
+    st.session_state[_TOKEN_KEY] = tok
+    expires = datetime.now(UTC) + timedelta(minutes=get_settings().jwt_access_minutes)
+    cm.set(_COOKIE_NAME, tok, expires_at=expires, key="qa_auth_set")
+    st.rerun()
+
+
+def _render_login(st, cm) -> None:
+    st.title("🔐 BizFinder Voice QA — Sign in")
     with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -159,13 +248,55 @@ def require_auth():
     if submitted:
         user = authenticate(email, password)
         if user:
-            tok = create_access_token(user.email)
-            st.session_state[_TOKEN_KEY] = tok
-            expires = datetime.now(UTC) + timedelta(minutes=get_settings().jwt_access_minutes)
-            cm.set(_COOKIE_NAME, tok, expires_at=expires, key="qa_auth_set")
-            st.rerun()
+            _complete_login(st, cm, user)
         st.error("Invalid email or password.")
-    st.stop()
+    if get_settings().allow_signup:
+        st.caption("Don't have an account?")
+        if st.button("Create an account →", key="to_signup"):
+            st.session_state[_VIEW_KEY] = "signup"
+            st.rerun()
+
+
+def _render_signup(st, cm) -> None:
+    st.title("🔐 BizFinder Voice QA — Create account")
+    with st.form("signup_form"):
+        name = st.text_input("Display name (optional)")
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        confirm = st.text_input("Confirm password", type="password")
+        submitted = st.form_submit_button("Create account")
+    if submitted:
+        err = signup_error(email, password, confirm)
+        if err:
+            st.error(err)
+        elif register_user(email, password, name=name) is None:
+            st.error("An account with that email already exists.")
+        else:
+            _complete_login(st, cm, authenticate(email, password))
+    st.caption("Already have an account?")
+    if st.button("← Back to sign in", key="to_login"):
+        st.session_state[_VIEW_KEY] = "login"
+        st.rerun()
+
+
+def signup_error(email: str, password: str, confirm: str) -> str | None:
+    """Validate signup inputs. Returns an error message, or ``None`` if valid (pure)."""
+    email = (email or "").strip()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        return "Enter a valid email address."
+    if len(password) < MIN_PASSWORD_LEN:
+        return f"Password must be at least {MIN_PASSWORD_LEN} characters."
+    if password != confirm:
+        return "Passwords don't match."
+    return None
+
+
+def current_user() -> User | None:
+    """The signed-in user from the session token — for pages rendered after the gate."""
+    import streamlit as st  # lazy
+
+    claims = decode_token(st.session_state.get(_TOKEN_KEY))
+    return _active_user(claims.get("sub")) if claims else None
 
 
 def require_password():

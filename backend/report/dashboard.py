@@ -15,7 +15,7 @@ from backend.report import data
 from backend.report.auth import require_auth
 from backend.report.nav import PageSpec, visible_specs
 from backend.report.theme import inject_theme
-from backend.report.views import overview, reports, rerun_page, run, scenarios
+from backend.report.views import overview, profile, reports, rerun_page, run, scenarios
 from backend.settings import get_settings
 
 
@@ -35,6 +35,7 @@ def _page_specs() -> list[PageSpec]:
         PageSpec(scenarios.render, "Scenarios", "🧪", "scenarios"),
         PageSpec(run.render, "Run suite", "▶️", "run-suite", requires_runs=True),
         PageSpec(rerun_page.render, "Re-run", "🔁", "re-run", requires_runs=True),
+        PageSpec(profile.render, "Profile", "👤", "profile"),
     ]
 
 

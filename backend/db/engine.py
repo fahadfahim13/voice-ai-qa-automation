@@ -80,7 +80,35 @@ def init_db() -> None:
         except OperationalError as exc:  # lost a cross-process create race → already there
             if "already exists" not in str(exc):
                 raise
+        _ensure_additive_columns()
         _initialized = True
+
+
+# Columns added to existing tables after v1 shipped. ``create_all`` only creates
+# missing *tables*, never missing *columns*, so for a DB that predates the column
+# we ALTER it in (SQLite supports cheap ADD COLUMN). No Alembic in v1.
+_ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
+    "users": {"name": "VARCHAR(255)"},
+}
+
+
+def _ensure_additive_columns() -> None:
+    """Add post-v1 columns to pre-existing tables (SQLite only; no-op otherwise)."""
+    from sqlalchemy import inspect, text
+
+    eng = get_engine()
+    if not get_settings().qa_db_url.startswith("sqlite"):
+        return
+    insp = inspect(eng)
+    existing_tables = set(insp.get_table_names())
+    for table, columns in _ADDITIVE_COLUMNS.items():
+        if table not in existing_tables:
+            continue
+        present = {c["name"] for c in insp.get_columns(table)}
+        for col, ddl in columns.items():
+            if col not in present:
+                with eng.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
 
 
 @contextmanager
