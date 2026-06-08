@@ -35,6 +35,7 @@ _COOKIE_NAME = "qa_auth"
 
 MIN_PASSWORD_LEN = 8
 _VIEW_KEY = "auth_view"  # session flag: "login" | "signup"
+_LOGOUT_KEY = "logged_out"  # forces signed-out state while the cookie delete settles
 
 
 def _secret() -> str:
@@ -208,7 +209,13 @@ def require_auth():
         st.sidebar.warning("⚠ JWT_SECRET not set — tokens won't survive a restart.")
 
     cm = _cookie_manager(st)
-    token = st.session_state.get(_TOKEN_KEY) or cm.get(_COOKIE_NAME)
+    # The cookie manager's delete is async: right after logout the stale cookie can
+    # still be read on the next rerun and silently re-auth the user. A session flag
+    # forces the signed-out state until a fresh login clears it.
+    if st.session_state.get(_LOGOUT_KEY):
+        token = None
+    else:
+        token = st.session_state.get(_TOKEN_KEY) or cm.get(_COOKIE_NAME)
     claims = decode_token(token)
     if claims:
         user = _active_user(claims.get("sub"))
@@ -217,9 +224,7 @@ def require_auth():
             st.session_state[_TOKEN_KEY] = token
             st.sidebar.caption(f"Signed in as **{user.name or user.email}**")
             if st.sidebar.button("Log out"):
-                st.session_state.pop(_TOKEN_KEY, None)
-                cm.delete(_COOKIE_NAME, key="qa_auth_del")
-                st.rerun()
+                _logout(st, cm)
             return user
 
     # Not authenticated → login or signup (separate views, same look).
@@ -232,10 +237,27 @@ def require_auth():
 
 def _complete_login(st, cm, user: User) -> None:
     """Issue a token, persist it (session + cookie), and rerun into the app."""
+    st.session_state.pop(_LOGOUT_KEY, None)  # a fresh login overrides a prior logout
     tok = create_access_token(user.email)
     st.session_state[_TOKEN_KEY] = tok
     expires = datetime.now(UTC) + timedelta(minutes=get_settings().jwt_access_minutes)
     cm.set(_COOKIE_NAME, tok, expires_at=expires, key="qa_auth_set")
+    st.rerun()
+
+
+def _logout(st, cm) -> None:
+    """Sign out: drop the session token, delete the cookie, flag it, and rerun.
+
+    The flag is the reliable part — the cookie ``delete`` round-trips to the browser
+    and can lag a rerun, so without the flag the user would be re-authenticated from
+    the stale cookie and the button would appear dead.
+    """
+    st.session_state[_LOGOUT_KEY] = True
+    st.session_state.pop(_TOKEN_KEY, None)
+    try:
+        cm.delete(_COOKIE_NAME, key="qa_auth_del")
+    except Exception:
+        pass  # cookie may already be absent; the session flag still forces logout
     st.rerun()
 
 

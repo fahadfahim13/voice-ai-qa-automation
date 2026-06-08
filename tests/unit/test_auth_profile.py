@@ -81,3 +81,45 @@ def test_update_profile_clear_name(test_db):
     auth.register_user("q@x.com", "pw12345678", name="Morpheus")
     user = auth.update_profile("q@x.com", name="")
     assert user is not None and user.name is None
+
+
+# --------------------------------------------------------------------------- #
+# logout / login session flags (fakes for st + cookie manager — no Streamlit runtime)
+# --------------------------------------------------------------------------- #
+class _FakeSt:
+    def __init__(self):
+        self.session_state: dict = {}
+        self.reran = False
+
+    def rerun(self):
+        self.reran = True
+
+
+class _FakeCm:
+    def __init__(self):
+        self.deleted = False
+        self.set_called = False
+
+    def delete(self, name, key=None):
+        self.deleted = True
+
+    def set(self, name, value, expires_at=None, key=None):
+        self.set_called = True
+
+
+def test_logout_forces_signed_out_state():
+    st, cm = _FakeSt(), _FakeCm()
+    st.session_state[auth._TOKEN_KEY] = "tok"
+    auth._logout(st, cm)
+    assert st.session_state.get(auth._LOGOUT_KEY) is True  # flag set so cookie is ignored
+    assert auth._TOKEN_KEY not in st.session_state  # session token cleared
+    assert cm.deleted and st.reran  # cookie deletion attempted + UI refreshed
+
+
+def test_login_clears_logout_flag():
+    st, cm = _FakeSt(), _FakeCm()
+    st.session_state[auth._LOGOUT_KEY] = True  # user had logged out earlier
+    auth._complete_login(st, cm, User(email="z@x.com", password_hash="h"))
+    assert auth._LOGOUT_KEY not in st.session_state  # fresh login overrides logout
+    assert st.session_state.get(auth._TOKEN_KEY)  # new token issued
+    assert cm.set_called and st.reran
