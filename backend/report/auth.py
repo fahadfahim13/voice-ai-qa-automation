@@ -253,6 +253,7 @@ def _logout(st, cm) -> None:
     the stale cookie and the button would appear dead.
     """
     st.session_state[_LOGOUT_KEY] = True
+    st.session_state[_VIEW_KEY] = "login"  # always land on the Login page after logout
     st.session_state.pop(_TOKEN_KEY, None)
     try:
         cm.delete(_COOKIE_NAME, key="qa_auth_del")

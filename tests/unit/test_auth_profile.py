@@ -110,9 +110,11 @@ class _FakeCm:
 def test_logout_forces_signed_out_state():
     st, cm = _FakeSt(), _FakeCm()
     st.session_state[auth._TOKEN_KEY] = "tok"
+    st.session_state[auth._VIEW_KEY] = "signup"  # user had toggled to the signup view
     auth._logout(st, cm)
     assert st.session_state.get(auth._LOGOUT_KEY) is True  # flag set so cookie is ignored
     assert auth._TOKEN_KEY not in st.session_state  # session token cleared
+    assert st.session_state.get(auth._VIEW_KEY) == "login"  # lands on the Login page
     assert cm.deleted and st.reran  # cookie deletion attempted + UI refreshed
 
 
