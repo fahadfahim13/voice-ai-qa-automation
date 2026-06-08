@@ -34,8 +34,10 @@ _TOKEN_KEY = "auth_token"
 _COOKIE_NAME = "qa_auth"
 
 MIN_PASSWORD_LEN = 8
-_VIEW_KEY = "auth_view"  # session flag: "login" | "signup"
 _LOGOUT_KEY = "logged_out"  # forces signed-out state while the cookie delete settles
+_CM_KEY = "_auth_cm"  # the cookie manager, shared into the auth pages for one run
+_PAGES_KEY = "_auth_pages"  # {"login": st.Page, "signup": st.Page} for switch/links
+_SIGNUP_DONE_KEY = "_signup_done"  # show "account created — sign in" on the login page
 
 
 def _secret() -> str:
@@ -227,12 +229,51 @@ def require_auth():
                 _logout(st, cm)
             return user
 
-    # Not authenticated → login or signup (separate views, same look).
-    if st.session_state.get(_VIEW_KEY) == "signup" and get_settings().allow_signup:
-        _render_signup(st, cm)
-    else:
-        _render_login(st, cm)
+    # Not authenticated → path-based /login + /signup pages (URL reflects the page).
+    _run_auth_nav(st, cm)
     st.stop()
+
+
+def _run_auth_nav(st, cm) -> None:
+    """Render the unauthenticated app: separate ``/login`` and ``/signup`` URLs.
+
+    Uses ``st.navigation`` so the browser URL changes between the two pages and so
+    logout / post-signup redirects move the URL to the login page. The cookie
+    manager + page handles are stashed in session_state for this run so the page
+    callables (which take no args) can reach them.
+    """
+    # A bare default page at "/" immediately redirects to "/login" so the login page
+    # has a real /login URL (Streamlit always serves the *default* page at root).
+    root_pg = st.Page(_root_redirect, title="BizFinder Voice QA", url_path="home", default=True)
+    login_pg = st.Page(_login_page, title="Sign in", url_path="login")
+    pages = [root_pg, login_pg]
+    signup_pg = None
+    if get_settings().allow_signup:
+        signup_pg = st.Page(_signup_page, title="Create account", url_path="signup")
+        pages.append(signup_pg)
+    st.session_state[_CM_KEY] = cm
+    st.session_state[_PAGES_KEY] = {"login": login_pg, "signup": signup_pg}
+    st.navigation(pages, position="hidden").run()
+
+
+def _root_redirect() -> None:
+    import streamlit as st  # lazy
+
+    login_pg = (st.session_state.get(_PAGES_KEY) or {}).get("login")
+    if login_pg is not None:
+        st.switch_page(login_pg)
+
+
+def _login_page() -> None:
+    import streamlit as st  # lazy
+
+    _render_login(st, st.session_state[_CM_KEY])
+
+
+def _signup_page() -> None:
+    import streamlit as st  # lazy
+
+    _render_signup(st, st.session_state[_CM_KEY])
 
 
 def _complete_login(st, cm, user: User) -> None:
@@ -253,17 +294,23 @@ def _logout(st, cm) -> None:
     the stale cookie and the button would appear dead.
     """
     st.session_state[_LOGOUT_KEY] = True
-    st.session_state[_VIEW_KEY] = "login"  # always land on the Login page after logout
     st.session_state.pop(_TOKEN_KEY, None)
     try:
         cm.delete(_COOKIE_NAME, key="qa_auth_del")
     except Exception:
         pass  # cookie may already be absent; the session flag still forces logout
+    # Redirect the URL to the login page if it's registered this run (it isn't on the
+    # logout click itself — the next rerun's auth nav defaults to /login).
+    login_pg = (st.session_state.get(_PAGES_KEY) or {}).get("login")
+    if login_pg is not None:
+        st.switch_page(login_pg)
     st.rerun()
 
 
 def _render_login(st, cm) -> None:
     st.title("🔐 BizFinder Voice QA — Sign in")
+    if st.session_state.pop(_SIGNUP_DONE_KEY, None):
+        st.success("Account created — please sign in.")
     with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -273,11 +320,10 @@ def _render_login(st, cm) -> None:
         if user:
             _complete_login(st, cm, user)
         st.error("Invalid email or password.")
-    if get_settings().allow_signup:
+    signup_pg = (st.session_state.get(_PAGES_KEY) or {}).get("signup")
+    if signup_pg is not None:
         st.caption("Don't have an account?")
-        if st.button("Create an account →", key="to_signup"):
-            st.session_state[_VIEW_KEY] = "signup"
-            st.rerun()
+        st.page_link(signup_pg, label="Create an account →")
 
 
 def _render_signup(st, cm) -> None:
@@ -288,6 +334,7 @@ def _render_signup(st, cm) -> None:
         password = st.text_input("Password", type="password")
         confirm = st.text_input("Confirm password", type="password")
         submitted = st.form_submit_button("Create account")
+    pages = st.session_state.get(_PAGES_KEY) or {}
     if submitted:
         err = signup_error(email, password, confirm)
         if err:
@@ -295,11 +342,14 @@ def _render_signup(st, cm) -> None:
         elif register_user(email, password, name=name) is None:
             st.error("An account with that email already exists.")
         else:
-            _complete_login(st, cm, authenticate(email, password))
-    st.caption("Already have an account?")
-    if st.button("← Back to sign in", key="to_login"):
-        st.session_state[_VIEW_KEY] = "login"
-        st.rerun()
+            # No auto-login: flag a success message and redirect the URL to /login.
+            st.session_state[_SIGNUP_DONE_KEY] = True
+            if pages.get("login") is not None:
+                st.switch_page(pages["login"])
+            st.rerun()
+    if pages.get("login") is not None:
+        st.caption("Already have an account?")
+        st.page_link(pages["login"], label="← Back to sign in")
 
 
 def signup_error(email: str, password: str, confirm: str) -> str | None:
