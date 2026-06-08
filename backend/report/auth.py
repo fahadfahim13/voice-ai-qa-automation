@@ -287,23 +287,22 @@ def _complete_login(st, cm, user: User) -> None:
 
 
 def _logout(st, cm) -> None:
-    """Sign out: drop the session token, delete the cookie, flag it, and rerun.
+    """Sign out: clear the session token + the auth cookie, then rerun to /login.
 
-    The flag is the reliable part — the cookie ``delete`` round-trips to the browser
-    and can lag a rerun, so without the flag the user would be re-authenticated from
-    the stale cookie and the button would appear dead.
+    Two things are deliberate, both learned from breaking it:
+    - **No ``st.switch_page`` here.** It raises a rerun immediately and interrupts the
+      cookie ``delete`` before it flushes, so the cookie would survive a refresh and
+      silently re-authenticate the user. Plain ``st.rerun`` lets the delete land; the
+      existing root-redirect page then moves the URL to ``/login``.
+    - **``delete`` only — no overwrite-with-expired ``set``.** The cookie manager's
+      ``set`` re-creates the cookie, which defeats the ``delete``.
     """
     st.session_state[_LOGOUT_KEY] = True
     st.session_state.pop(_TOKEN_KEY, None)
     try:
         cm.delete(_COOKIE_NAME, key="qa_auth_del")
     except Exception:
-        pass  # cookie may already be absent; the session flag still forces logout
-    # Redirect the URL to the login page if it's registered this run (it isn't on the
-    # logout click itself — the next rerun's auth nav defaults to /login).
-    login_pg = (st.session_state.get(_PAGES_KEY) or {}).get("login")
-    if login_pg is not None:
-        st.switch_page(login_pg)
+        pass  # cookie may already be absent; the _LOGOUT_KEY flag still forces logout
     st.rerun()
 
 
