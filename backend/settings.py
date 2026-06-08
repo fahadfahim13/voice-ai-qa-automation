@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     harness_recordings_dir: Path = REPO_ROOT / "recordings"
     harness_reports_dir: Path = REPO_ROOT / "reports"
 
+    # Deploy controls (C11). On the rootless analytics VPS, Chromium system libs are
+    # missing until an ops root step, so live runs are gated off there (Phase A =
+    # reporting-only); headless is forced on for any host with no display.
+    harness_runs_enabled: bool = True  # env HARNESS_RUNS_ENABLED — hide Run/Re-run when false
+    harness_headless: bool = False  # env HARNESS_HEADLESS — default --headless for jobs
+
 
 _settings: Settings | None = None
 

@@ -13,8 +13,10 @@ import streamlit as st  # type: ignore
 
 from backend.report import data
 from backend.report.auth import require_auth
+from backend.report.nav import PageSpec, visible_specs
 from backend.report.theme import inject_theme
 from backend.report.views import overview, reports, rerun_page, run, scenarios
+from backend.settings import get_settings
 
 
 def _render_health_badge() -> None:
@@ -25,6 +27,17 @@ def _render_health_badge() -> None:
         st.sidebar.error(f"🔴 QA API: {health.get('error', 'unreachable')}")
 
 
+def _page_specs() -> list[PageSpec]:
+    """All dashboard pages; Run/Re-run require live-run (browser) capability."""
+    return [
+        PageSpec(overview.render, "Overview", "📊", "overview", default=True),
+        PageSpec(reports.render, "Reports", "📄", "reports"),
+        PageSpec(scenarios.render, "Scenarios", "🧪", "scenarios"),
+        PageSpec(run.render, "Run suite", "▶️", "run-suite", requires_runs=True),
+        PageSpec(rerun_page.render, "Re-run", "🔁", "re-run", requires_runs=True),
+    ]
+
+
 def main() -> None:
     st.set_page_config(page_title="BizFinder Voice QA", layout="wide")
     inject_theme()  # premium look (CSS only — no behaviour change)
@@ -33,12 +46,17 @@ def main() -> None:
 
     _render_health_badge()
 
+    runs_enabled = get_settings().harness_runs_enabled
+    if not runs_enabled:
+        st.info(
+            "Live runs are disabled on this host (pending Chromium system libs). "
+            "Reporting is available."
+        )
+
+    specs = visible_specs(_page_specs(), runs_enabled=runs_enabled)
     pages = [
-        st.Page(overview.render, title="Overview", icon="📊", url_path="overview", default=True),
-        st.Page(reports.render, title="Reports", icon="📄", url_path="reports"),
-        st.Page(scenarios.render, title="Scenarios", icon="🧪", url_path="scenarios"),
-        st.Page(run.render, title="Run suite", icon="▶️", url_path="run-suite"),
-        st.Page(rerun_page.render, title="Re-run", icon="🔁", url_path="re-run"),
+        st.Page(s.view, title=s.title, icon=s.icon, url_path=s.url_path, default=s.default)
+        for s in specs
     ]
     st.navigation(pages).run()
 
