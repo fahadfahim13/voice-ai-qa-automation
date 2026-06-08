@@ -41,6 +41,11 @@ def render_call(c: dict) -> None:
         if c.get("audio_verdict") and not c["audio_verdict"].get("error"):
             st.subheader("Audio judge")
             st.json(c["audio_verdict"])
+        full_call = artifacts.get("full_call_audio")
         bot_audio = artifacts.get("bot_audio")
-        if bot_audio and Path(bot_audio).exists():
+        if full_call and Path(full_call).exists():
+            st.caption("Full call (you + bot)")
+            st.audio(full_call)
+        elif bot_audio and Path(bot_audio).exists():
+            st.caption("Bot only")
             st.audio(bot_audio)

@@ -97,3 +97,32 @@ def build_full_call(
         n / sample_rate, offset_sec, out_path,
     )
     return out_path
+
+
+def backfill_full_call(call_dir: Path, *, sample_rate: int = DEFAULT_SR) -> Path | None:
+    """(Re)build ``full_call.wav`` for an existing call dir so old runs are playable.
+
+    Reads ``scenario.wav`` + ``bot.webm`` + ``audio_log.json`` from ``call_dir``.
+    Returns the written path, or ``None`` (logging a warning, never raising) if a
+    required input is missing or ffmpeg can't decode the bot audio.
+    """
+    call_dir = Path(call_dir)
+    scenario_wav = call_dir / "scenario.wav"
+    bot_audio = call_dir / "bot.webm"
+    audio_log = call_dir / "audio_log.json"
+    if not scenario_wav.exists() or not bot_audio.exists():
+        logger.warning(
+            "backfill_full_call: missing scenario.wav or bot.webm in {}", call_dir
+        )
+        return None
+    try:
+        return build_full_call(
+            scenario_wav=scenario_wav,
+            bot_audio=bot_audio,
+            audio_log_path=audio_log,
+            out_path=call_dir / "full_call.wav",
+            sample_rate=sample_rate,
+        )
+    except Exception as exc:  # ffmpeg missing / decode failure — don't crash callers
+        logger.warning("backfill_full_call failed for {}: {}", call_dir, exc)
+        return None

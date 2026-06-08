@@ -16,6 +16,7 @@ flips the record to ``done``/``error`` on exit.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -94,6 +95,8 @@ def start_job(
     ids: list[str] | None = None,
     max_n: int | None = None,
     site_id: str | None = None,
+    website: str | None = None,
+    name: str | None = None,
     suite_version: str = "v1.0",
     headless: bool | None = None,
     audio_judge: bool = True,
@@ -101,8 +104,12 @@ def start_job(
 ) -> str:
     """Launch a suite run as a background subprocess; return its ``job_id``.
 
-    Returns immediately — poll with :func:`get_job`. ``headless=None`` (the default)
-    resolves from ``HARNESS_HEADLESS`` so headless hosts (e.g. the VPS) force it on.
+    Returns immediately — poll with :func:`get_job`. ``website`` is the
+    operator-entered target (normalized upstream); the resolved siteId is cached
+    back onto its DB row when the run finishes (see :func:`_wait_and_finalize`).
+    ``name`` is a human, editable label — defaults to the website when omitted.
+    ``headless=None`` (the default) resolves from ``HARNESS_HEADLESS`` so headless
+    hosts (e.g. the VPS) force it on.
     """
     settings = get_settings()
     if headless is None:
@@ -125,6 +132,8 @@ def start_job(
 
     record = {
         "id": job_id,
+        "name": (name or "").strip() or website or site_id or job_id,
+        "website": website,
         "status": "queued",
         "argv": argv,
         "started_at": datetime.now(UTC).isoformat(),
@@ -169,10 +178,47 @@ def _wait_and_finalize(job_id: str, proc: subprocess.Popen, logf) -> None:
     if rc == 0:
         record["status"] = "done"
         record["error"] = None
+        _cache_resolved_site_id(record)
     else:
         record["status"] = "error"
         record["error"] = f"subprocess exited with code {rc}"
     _write_job(record)
+
+
+def _first_resolved_site_id(suite_dir: Path) -> str | None:
+    """First truthy ``resolved_site_id`` across a finished suite's calls, if any."""
+    from backend.report import data
+
+    suite = data.load_suite(suite_dir)
+    if not suite:
+        return None
+    for call in suite.get("calls", []):
+        resolved = (call.get("artifacts") or {}).get("resolved_site_id")
+        if resolved:
+            return resolved
+    return None
+
+
+def _cache_resolved_site_id(record: dict) -> None:
+    """Cache the run's resolved internal siteId onto its Website row.
+
+    Runs exactly once per job (here in the long-lived server process), so it is
+    the single DB writer for this mapping — no SQLite lock contention with the
+    call subprocess, which stays DB-agnostic. Never raises into job finalize.
+    """
+    website = record.get("website")
+    if not website:
+        return
+    try:
+        resolved = _first_resolved_site_id(Path(record["suite_dir"]))
+        if not resolved:
+            return
+        from backend.db import init_db, set_site_id
+
+        init_db()  # idempotent; ensures schema in the server process
+        set_site_id(website, resolved)
+    except Exception as exc:  # writeback is best-effort
+        logging.getLogger(__name__).warning("siteId writeback failed: %s", exc)
 
 
 def get_job(job_id: str) -> dict | None:
@@ -199,6 +245,19 @@ def list_jobs() -> list[dict]:
             continue
     out.sort(key=lambda r: (r.get("started_at") or "", r.get("id") or ""), reverse=True)
     return out
+
+
+def rename_job(job_id: str, new_name: str) -> bool:
+    """Set a job's human label. Returns ``False`` cleanly if the id is unknown.
+
+    ``job_id`` stays the internal key; ``name`` is display-only and editable.
+    """
+    record = get_job(job_id)
+    if record is None:
+        return False
+    record["name"] = (new_name or "").strip() or record.get("name") or job_id
+    _write_job(record)
+    return True
 
 
 def tail_log(job_id: str, n: int = 50) -> str:

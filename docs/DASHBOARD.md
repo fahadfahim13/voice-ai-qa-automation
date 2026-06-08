@@ -36,6 +36,24 @@ scripts/
 through `job_manager.start_job` as a subprocess so Streamlit stays responsive and
 survives reruns. Nothing in the shared layer raises into the UI.
 
+## Run page & recordings (C10)
+
+- **Website input, not siteId.** The Run page targets a **website** (URL/hostname),
+  normalized to a canonical host (`backend/db/websites.py::normalize_url`) and stored
+  in the `websites` table (`backend/db/models.py::Website`). The internal `siteId` is
+  resolved by the widget at call time and **cached back** onto the row when the run
+  finishes (`job_manager._wait_and_finalize` → `set_site_id`). The raw siteId, a
+  Validate button, and the admin URL→siteId scan live behind the Run page's
+  **Advanced (siteId / debug)** expander.
+- **Full-call audio.** Recordings play `full_call.wav` — a stereo mix (left = our
+  caller, right = bot) built by `backend/audio_mix.py::build_full_call`; it falls back
+  to bot-only `bot.webm` if the mix is missing. **ffmpeg is required** for the mix and
+  is provided by the bundled `imageio-ffmpeg` dependency (no system install needed).
+  `audio_mix.backfill_full_call(call_dir)` rebuilds the mix for old runs.
+- **Job names.** Jobs carry an editable `name` (defaults to `"{website} {timestamp}"`);
+  the `{timestamp}_{uuid}` `job_id` stays the internal key. Rename via the Run page's
+  **✏️ Rename** control (`job_manager.rename_job`).
+
 ## Auth gate
 
 **Per-user accounts (C9).** `backend/report/auth.py::require_auth()` is called once
