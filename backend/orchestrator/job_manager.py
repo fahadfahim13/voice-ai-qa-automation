@@ -98,7 +98,7 @@ def start_job(
     website: str | None = None,
     name: str | None = None,
     suite_version: str = "v1.0",
-    headless: bool = True,
+    headless: bool | None = None,
     audio_judge: bool = True,
     dry_run: bool = False,
 ) -> str:
@@ -108,10 +108,15 @@ def start_job(
     operator-entered target (normalized upstream); the resolved siteId is cached
     back onto its DB row when the run finishes (see :func:`_wait_and_finalize`).
     ``name`` is a human, editable label — defaults to the website when omitted.
+    ``headless=None`` (the default) resolves from ``HARNESS_HEADLESS`` so headless
+    hosts (e.g. the VPS) force it on.
     """
+    settings = get_settings()
+    if headless is None:
+        headless = settings.harness_headless
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     job_id = f"{ts}_{uuid4().hex[:8]}"
-    suite_dir = get_settings().harness_reports_dir / f"suite_{job_id}"
+    suite_dir = settings.harness_reports_dir / f"suite_{job_id}"
 
     argv = build_run_argv(
         job_id,

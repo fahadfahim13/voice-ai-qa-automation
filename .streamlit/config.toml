@@ -3,11 +3,21 @@
 [theme]
 base = "dark"
 primaryColor = "#7c5cff"            # refined indigo-violet accent
-backgroundColor = "#0e1117"         # deep midnight base
-secondaryBackgroundColor = "#171c28" # elevated surface: sidebar, inputs, cards
-textColor = "#e6e9f0"               # soft off-white
+backgroundColor = "#080a0f"         # near-black / OLED base
+secondaryBackgroundColor = "#14171f" # elevated surface: sidebar, inputs, cards
+textColor = "#eef1f7"               # soft off-white
 linkColor = "#9b8cff"
-borderColor = "#262c3a"
+borderColor = "#23262f"
 font = "sans serif"
 headingFont = "sans serif"
 baseFontSize = 16
+
+# Server (C11). Bind localhost only — the VPS exposes the dashboard via SSH tunnel,
+# not raw on the public IP without TLS. headless=true just skips auto-opening a
+# browser (harmless for local dev). Defaults are single-origin-tunnel safe.
+[server]
+headless = true
+address = "127.0.0.1"
+port = 8501
+enableXsrfProtection = true
+enableCORS = true

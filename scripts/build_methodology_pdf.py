@@ -148,48 +148,107 @@ AXES: list[tuple[str, str, str]] = [
 TEMPLATE = Template(
     r"""
 <!doctype html>
-<html><head><meta charset="utf-8"><title>BizFinder Voice QA — Testing Methodology</title>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BizFinder Voice QA — Testing Methodology</title>
 <style>
+  /* Palette mirrors the report/dashboard: cohesive indigo + violet, WCAG AA. */
+  :root{
+    --ink:#0f172a;--ink-soft:#334155;--muted:#475569;--line:#e5e7eb;
+    --brand:#4f46e5;--brand-2:#7c3aed;--brand-ink:#3730a3;
+    --soft:#f8f9ff;--chip-bg:#eef2ff;
+  }
   @page { size: A4; margin: 14mm; }
-  html, body { font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1f2937; }
-  body { margin: 0; font-size: 11.5pt; line-height: 1.45; }
-  h1 { font-size: 18pt; margin: 0 0 2pt; color: #111827; letter-spacing: -0.2pt; }
-  .subhead { color: #6b7280; font-size: 10pt; margin: 0 0 16pt; }
-  h2 { font-size: 14pt; margin: 22pt 0 6pt; color: #111827; border-bottom: 1pt solid #e5e7eb; padding-bottom: 3pt; }
-  h3 { font-size: 12pt; margin: 14pt 0 4pt; color: #111827; }
+  html, body { font-family: "Inter", "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; color: var(--ink-soft); }
+  body { margin: 0; font-size: 11.5pt; line-height: 1.5; }
+
+  /* Premium title band — prints cleanly (print_background=True) and looks good on screen. */
+  .hero { background: linear-gradient(135deg, #5b3fd6, #7c5cff); color: #fff;
+          border-radius: 12pt; padding: 18pt 22pt; margin: 0 0 18pt; }
+  .hero h1 { color: #fff; font-size: 20pt; margin: 0 0 4pt; letter-spacing: -0.3pt; font-weight: 700; }
+  .hero .subhead { color: rgba(255,255,255,.92); font-size: 10.5pt; margin: 0; }
+  .hero .meta-strip { color: rgba(255,255,255,.85); font-size: 9.5pt; margin: 8pt 0 0; }
+
+  h1 { font-size: 18pt; margin: 0 0 2pt; color: var(--ink); letter-spacing: -0.2pt; }
+  .subhead { color: var(--muted); font-size: 10pt; margin: 0 0 16pt; }
+  h2 { font-size: 14pt; margin: 22pt 0 8pt; color: var(--ink); padding: 0 0 4pt 9pt;
+       border-left: 4pt solid var(--brand); letter-spacing: -0.2pt; }
+  h3 { font-size: 12pt; margin: 14pt 0 4pt; color: var(--ink); }
   p { margin: 4pt 0; }
-  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 10pt; }
-  th, td { border: 1px solid #e5e7eb; padding: 5pt 7pt; text-align: left; vertical-align: top; }
-  th { background: #f3f4f6; font-weight: 600; color: #374151; }
-  .axis-name { font-weight: 600; color: #111827; white-space: nowrap; }
-  .crit-name { font-family: "Consolas", "Menlo", monospace; font-size: 11pt; color: #4338ca; }
-  .crit-blurb { color: #374151; margin: 2pt 0 6pt; }
-  .ex { margin: 4pt 0 0 0; padding: 6pt 9pt; background: #f9fafb; border-left: 3pt solid #c7d2fe; }
-  .ex-title { font-weight: 600; color: #111827; font-size: 10.5pt; }
-  .ex-id { font-family: "Consolas", "Menlo", monospace; font-size: 9.5pt; color: #6b7280; }
-  .ex-meta { font-size: 10pt; color: #374151; margin: 2pt 0; }
-  .ex-meta strong { color: #111827; }
-  .ex-chip { display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 9pt; padding: 0 6pt; font-size: 9pt; margin-left: 6pt; vertical-align: 1pt; }
-  .lib-id { font-family: "Consolas", "Menlo", monospace; font-size: 9pt; word-break: break-word; }
-  .small { font-size: 9.5pt; color: #4b5563; }
-  .meta-strip { font-size: 9.5pt; color: #6b7280; margin: 0 0 14pt; }
-  .scoring-box { background: #f9fafb; border: 1pt solid #e5e7eb; border-radius: 4pt; padding: 8pt 10pt; margin: 4pt 0 14pt; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 10pt; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--line); padding: 6pt 8pt; text-align: left; vertical-align: top; }
+  th { background: var(--chip-bg); font-weight: 650; color: var(--brand-ink); }
+  tbody tr:nth-child(even) td { background: var(--soft); }
+  .axis-name { font-weight: 650; color: var(--ink); white-space: nowrap; }
+  .crit-name { font-family: "Consolas", "Menlo", monospace; font-size: 11pt; color: var(--brand); }
+  .crit-blurb { color: var(--ink-soft); margin: 2pt 0 6pt; }
+  .ex { margin: 4pt 0 0 0; padding: 7pt 10pt; background: var(--soft); border-left: 3pt solid var(--brand); border-radius: 0 4pt 4pt 0; }
+  .ex-title { font-weight: 650; color: var(--ink); font-size: 10.5pt; }
+  .ex-id { font-family: "Consolas", "Menlo", monospace; font-size: 9.5pt; color: var(--muted); }
+  .ex-meta { font-size: 10pt; color: var(--ink-soft); margin: 2pt 0; }
+  .ex-meta strong { color: var(--ink); }
+  .ex-chip { display: inline-block; background: var(--chip-bg); color: var(--brand-ink); border: 1px solid #e0e7ff; border-radius: 9pt; padding: 0 7pt; font-size: 9pt; margin-left: 6pt; vertical-align: 1pt; }
+  .lib-id { font-family: "Consolas", "Menlo", monospace; font-size: 9pt; word-break: break-word; color: var(--muted); }
+  .small { font-size: 9.5pt; color: var(--muted); }
+  .meta-strip { font-size: 9.5pt; color: var(--muted); margin: 0 0 14pt; }
+  .scoring-box { background: var(--soft); border: 1pt solid var(--line); border-left: 4pt solid var(--brand-2); border-radius: 4pt; padding: 10pt 12pt; margin: 4pt 0 14pt; }
   .scoring-box ul { margin: 4pt 0 0 14pt; padding: 0; }
   .scoring-box li { margin: 2pt 0; font-size: 10.5pt; }
-  .scoring-box .label { color: #374151; font-weight: 600; }
-  .footnote { font-size: 9.5pt; color: #6b7280; margin: 4pt 0 0; font-style: italic; }
+  .scoring-box .label { color: var(--ink); font-weight: 650; }
+  .footnote { font-size: 9.5pt; color: var(--muted); margin: 4pt 0 0; font-style: italic; }
   .criterion-block { page-break-inside: avoid; }
   h2 { page-break-after: avoid; }
   h3 { page-break-after: avoid; }
-</style></head><body>
 
-<h1>BizFinder Voice QA — Testing Methodology</h1>
-<p class="subhead">How we generate test scenarios and how we score each call.</p>
-<p class="meta-strip">v{{ version }} · published {{ date }}</p>
+  /* On-screen only: DARK (OLED) theme + premium chrome + responsiveness.
+     Re-declaring the tokens here flips every base rule to dark on screen, while
+     the PDF (print media) keeps the light :root above for a clean, ink-friendly doc. */
+  @media screen {
+    :root{
+      --ink:#eef1f7; --ink-soft:#cdd3e0; --muted:#a3acc2; --line:rgba(255,255,255,.08);
+      --brand:#9b8cff; --brand-2:#9b8cff; --brand-ink:#c7bbff;
+      --soft:rgba(255,255,255,.04); --chip-bg:rgba(124,92,255,.14);
+    }
+    body { color: var(--ink-soft);
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+      background:
+        radial-gradient(60% 50% at 20% 0%, rgba(124,92,255,.10), transparent 60%),
+        radial-gradient(50% 50% at 88% 8%, rgba(80,70,229,.08), transparent 60%),
+        #080a0f;
+      background-attachment: fixed; padding: 28px 16px 64px;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+    .doc { max-width: 920px; margin: 0 auto; background: #14171f;
+      border: 1px solid rgba(255,255,255,.08); border-radius: 18px;
+      box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 2px 8px rgba(0,0,0,.45), 0 28px 70px -28px rgba(0,0,0,.8);
+      padding: 30px 36px 40px;
+      animation: docrise .6s cubic-bezier(.22,.61,.36,1) both; }
+    @keyframes docrise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    .ex-chip { border-color: rgba(124,92,255,.25); }
+    .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    ::-webkit-scrollbar { width: 11px; height: 11px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.20); background-clip: content-box; }
+    @media (prefers-reduced-motion: reduce) { .doc { animation: none; } }
+  }
+  @media screen and (max-width: 600px) {
+    .doc { padding: 20px 16px 28px; border-radius: 14px; }
+    .hero { padding: 16pt 16pt; }
+    .hero h1 { font-size: 17pt; }
+  }
+</style></head><body>
+<div class="doc">
+
+<header class="hero">
+  <h1>BizFinder Voice QA — Testing Methodology</h1>
+  <p class="subhead">How we generate test scenarios and how we score each call.</p>
+  <p class="meta-strip">v{{ version }} · published {{ date }}</p>
+</header>
 
 <h2>1. Testing axes</h2>
 <p>Every scenario is a point in this eight-dimensional space. Coverage across axes
 is what makes the suite representative of real caller behaviour.</p>
+<div class="tablewrap">
 <table>
   <tr><th style="width:18%">Axis</th><th style="width:32%">What it captures</th><th>Values we currently use</th></tr>
   {% for name, blurb, values in axes %}
@@ -200,6 +259,7 @@ is what makes the suite representative of real caller behaviour.</p>
   </tr>
   {% endfor %}
 </table>
+</div>
 
 <h2>2. Evaluation criteria</h2>
 <p>Every call is scored on all ten criteria in [0, 1] by an LLM judge with full
@@ -236,6 +296,7 @@ access to the call transcript, the QA-API metrics, and the scenario's expected o
 <h2>3. Scenario library (current baseline)</h2>
 <p>The full set of scenarios shipping in the suite today. Client-specific
 scenarios will be added on top of this baseline.</p>
+<div class="tablewrap">
 <table>
   <tr>
     <th style="width:20%">Scenario</th>
@@ -256,8 +317,10 @@ scenarios will be added on top of this baseline.</p>
   </tr>
   {% endfor %}
 </table>
+</div>
 <p class="footnote">Coverage today: {{ library|length }} scenarios. Three axes (noise, language, complexity) currently exercise a single value each; values marked <em>(planned)</em> in Section&nbsp;1 are on the expansion roadmap.</p>
 
+</div>
 </body></html>
 """
 )

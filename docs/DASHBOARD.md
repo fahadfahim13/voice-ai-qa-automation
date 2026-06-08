@@ -82,21 +82,60 @@ CLI (`uv run python -m scripts.qa_smoke_test`, exit non-zero on failure).
 2. Register it in `dashboard.py`:
    `st.Page(<name>.render, title="…", icon="…", url_path="…")`.
 
-## Deploy notes (Priority 4)
+## Deploy notes (Priority 4 / C11) — rootless bare-metal on the `analytics` VPS
 
-Host on Coolify (extend Streamlit; no main-app JWT). Required env vars:
+A live audit (2026-06-05) of `analytics@38.247.189.143:2203` showed an **unprivileged
+jail**: 72 vCPU / 251 GB RAM but **no `sudo`, `apt`, `systemd`, or Docker** — so a
+Docker/Coolify deploy **cannot run on this box**. We deploy **bare-metal** (uv venv +
+`nohup`), bind `127.0.0.1`, and reach it via an **SSH tunnel**; the C9 login gates the UI.
 
+### Tiered rollout
+- **Phase A — reporting-only (today, zero ops).** `HARNESS_RUNS_ENABLED=false` hides the
+  Run / Re-run pages (no Chromium needed). Reports / Scenarios / smoke test all work.
+- **Phase B — full runner (after one ops step).** Chromium + its system libs are missing
+  and `playwright install-deps` needs **root**, so ops runs once on the host:
+  `playwright install-deps chromium` (root), then on the box
+  `uv run playwright install chromium`; set `HARNESS_RUNS_ENABLED=1` and restart.
+  If `install-deps` is unavailable, the apt packages are: `libnss3 libnssutil3
+  libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1 libasound2 libxkbcommon0
+  libpango-1.0-0 libxcomposite1 libxdamage1 libxrandr2 libgtk-3-0`.
+- **Phase C — optional managed ingress.** Ask ops to route a subdomain → `:8501` with
+  TLS; then bind `0.0.0.0` and rely on the C9 JWT instead of the tunnel.
+
+### Scripts (`scripts/vps_*.sh`)
+| Script | What it does |
+|--------|--------------|
+| `vps_bootstrap.sh` | idempotent: install `uv`→`~/.local`, clone/pull repo→`~/qa`, `uv sync --extra report`, scaffold `~/qa/.env` (chmod 600), link `~/recordings`. **Never writes secrets.** |
+| `vps_start.sh` | launch Streamlit via `nohup` bound to `127.0.0.1:8501`, PID→`~/qa/dashboard.pid`, log→`~/qa/dashboard.log`. Refuses to double-start. |
+| `vps_stop.sh` | TERM→KILL the PID-file process; clears stale PIDs. |
+| `vps_status.sh` | PID liveness + `curl /_stcore/health`. |
+
+**No boot persistence** (no systemd/cron) — after a container restart, re-run
+`vps_start.sh` manually. Optional: `npx pm2` for crash-restart only (won't survive a host reboot).
+
+### Phase-A access (SSH tunnel)
+```
+ssh -L 8501:127.0.0.1:8501 -p 2203 analytics@38.247.189.143
+# then open http://localhost:8501 and log in (C9)
+```
+
+### Env vars (set real values only in `~/qa/.env`, chmod 600 — never commit)
 | Var | Purpose |
 |-----|---------|
-| `QA_SHARED_SECRET` | QA Read API (`X-QA-Secret`) |
+| `QA_SHARED_SECRET` | QA Read API (`X-QA-Secret`). The value in `.env.example` is a placeholder; the previously-committed live secret must be **rotated** (handover §17). |
 | `OPENROUTER_API_KEY` | caller persona + judges (real runs) |
 | `OPENAI_API_KEY` | TTS/STT (real runs) |
-| `JWT_SECRET` | **set in prod** — long random string signing auth tokens (C9) |
+| `JWT_SECRET` | **set in prod** — long random string signing auth tokens (C9); unset → logins reset on restart |
 | `JWT_ACCESS_MINUTES` | token TTL (default `720` = 12h) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed the first dashboard user on first run |
 | `QA_DB_URL` | user DB (default `sqlite:///reports/qa.db`) |
+| `HARNESS_RUNS_ENABLED` | `false` = reporting-only (Phase A); `true` = full runner (Phase B) |
+| `HARNESS_HEADLESS` | `1` forces `--headless` for dashboard-launched runs (set on headless hosts) |
+| `HARNESS_CONCURRENCY` | parallel scenario workers (default `2`) |
 | `DASHBOARD_PASSWORD` | legacy C8 shared gate (superseded by per-user auth) |
 
-Run command: `uv run --extra report streamlit run backend/report/dashboard.py`.
-On boot, open the dashboard and click **🩺 Run smoke test** (Overview) to confirm
-the deployment can reach the QA API and the secret is enforced.
+On boot, open the dashboard and click **🩺 Run smoke test** (Overview) to confirm the
+deployment can reach the QA API and the secret is enforced.
+
+> **Future managed option:** a publicly-reachable, auto-restarting deploy fits Coolify
+> on a *different* ops host (with root/Docker) — not this rootless jail.
