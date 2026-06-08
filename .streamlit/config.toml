@@ -3,11 +3,11 @@
 [theme]
 base = "dark"
 primaryColor = "#7c5cff"            # refined indigo-violet accent
-backgroundColor = "#0e1117"         # deep midnight base
-secondaryBackgroundColor = "#171c28" # elevated surface: sidebar, inputs, cards
-textColor = "#e6e9f0"               # soft off-white
+backgroundColor = "#080a0f"         # near-black / OLED base
+secondaryBackgroundColor = "#14171f" # elevated surface: sidebar, inputs, cards
+textColor = "#eef1f7"               # soft off-white
 linkColor = "#9b8cff"
-borderColor = "#262c3a"
+borderColor = "#23262f"
 font = "sans serif"
 headingFont = "sans serif"
 baseFontSize = 16

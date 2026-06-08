@@ -13,6 +13,7 @@ import streamlit as st  # type: ignore
 
 from backend.report import data
 from backend.report.auth import require_auth
+from backend.report.theme import inject_theme
 from backend.report.views import overview, reports, rerun_page, run, scenarios
 
 
@@ -26,6 +27,7 @@ def _render_health_badge() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="BizFinder Voice QA", layout="wide")
+    inject_theme()  # premium look (CSS only — no behaviour change)
 
     require_auth()  # per-user login gate (renders login form + owns sidebar user/logout)
 
