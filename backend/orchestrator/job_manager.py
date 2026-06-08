@@ -95,17 +95,21 @@ def start_job(
     max_n: int | None = None,
     site_id: str | None = None,
     suite_version: str = "v1.0",
-    headless: bool = True,
+    headless: bool | None = None,
     audio_judge: bool = True,
     dry_run: bool = False,
 ) -> str:
     """Launch a suite run as a background subprocess; return its ``job_id``.
 
-    Returns immediately — poll with :func:`get_job`.
+    Returns immediately — poll with :func:`get_job`. ``headless=None`` (the default)
+    resolves from ``HARNESS_HEADLESS`` so headless hosts (e.g. the VPS) force it on.
     """
+    settings = get_settings()
+    if headless is None:
+        headless = settings.harness_headless
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     job_id = f"{ts}_{uuid4().hex[:8]}"
-    suite_dir = get_settings().harness_reports_dir / f"suite_{job_id}"
+    suite_dir = settings.harness_reports_dir / f"suite_{job_id}"
 
     argv = build_run_argv(
         job_id,
