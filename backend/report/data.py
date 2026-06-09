@@ -66,13 +66,17 @@ def load_suite(suite_dir: Path) -> dict:
 
     Returns ``{}`` when ``suite.json`` is absent or unreadable. Optional keys
     are filled with sane defaults so callers can index without guarding.
+
+    We do not pre-check ``exists()``: ``Path.exists()`` re-raises ``EACCES``
+    (a dir the dashboard user can't traverse) instead of returning ``False``,
+    which would crash the page. Letting ``read_text`` raise covers both the
+    missing (``FileNotFoundError``) and locked (``PermissionError``) cases —
+    both ``OSError`` — so an unreadable suite dir is simply skipped.
     """
     suite_json = Path(suite_dir) / "suite.json"
-    if not suite_json.exists():
-        return {}
     try:
         data = json.loads(suite_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (OSError, json.JSONDecodeError):
         return {}
     if not isinstance(data, dict):
         return {}

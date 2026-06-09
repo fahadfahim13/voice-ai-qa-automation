@@ -60,6 +60,54 @@ def test_list_loaded_suites_skips_incomplete_and_unreadable(tmp_path, monkeypatc
     assert loaded[0][1]["n_total"] == 1
 
 
+def test_load_suite_permission_denied_returns_empty(tmp_path, monkeypatch):
+    """A suite dir the dashboard user can't read is skipped, not raised.
+
+    Regression: ``Path.exists()`` re-raises EACCES instead of returning False,
+    so a suite.json the process can't stat/read once crashed the whole page.
+    """
+    suite_dir = tmp_path / "suite_locked"
+    suite_dir.mkdir()
+    (suite_dir / "suite.json").write_text(json.dumps({"n_total": 1}), encoding="utf-8")
+
+    orig_read_text = Path.read_text
+
+    def deny(self, *args, **kwargs):
+        if self.name == "suite.json":
+            raise PermissionError(13, "Permission denied")
+        return orig_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", deny)
+
+    assert data.load_suite(suite_dir) == {}
+
+
+def test_list_loaded_suites_skips_permission_denied(tmp_path, monkeypatch):
+    """One unreadable suite dir must not take down the whole listing.
+
+    Reproduces the production failure on ``suite_20260609T103851Z_aa763f3b``.
+    """
+    good = tmp_path / "suite_20260601T000000Z"
+    good.mkdir()
+    (good / "suite.json").write_text(json.dumps({"n_total": 1}), encoding="utf-8")
+    locked = tmp_path / "suite_20260609T103851Z_aa763f3b"
+    locked.mkdir()
+    (locked / "suite.json").write_text(json.dumps({"n_total": 9}), encoding="utf-8")
+
+    orig_read_text = Path.read_text
+
+    def deny(self, *args, **kwargs):
+        if "suite_20260609T103851Z_aa763f3b" in str(self):
+            raise PermissionError(13, "Permission denied")
+        return orig_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", deny)
+    monkeypatch.setattr(data, "_suites_dir", lambda: tmp_path)
+
+    loaded = data.list_loaded_suites()  # must not raise
+    assert [p.name for p, _ in loaded] == ["suite_20260601T000000Z"]
+
+
 def test_load_suite_full(tmp_path):
     suite_dir = tmp_path / "suite_full"
     suite_dir.mkdir()
