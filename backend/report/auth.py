@@ -15,6 +15,7 @@ shim that now delegates to ``require_auth``.
 from __future__ import annotations
 
 import secrets
+import time
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -283,6 +284,11 @@ def _complete_login(st, cm, user: User) -> None:
     st.session_state[_TOKEN_KEY] = tok
     expires = datetime.now(UTC) + timedelta(minutes=get_settings().jwt_access_minutes)
     cm.set(_COOKIE_NAME, tok, expires_at=expires, key="qa_auth_set")
+    # CookieManager.set() only *queues* the browser write; it lands on the component's
+    # next render round-trip. Rerunning immediately tears down this run before the write
+    # flushes, so the cookie never persists and the session dies on refresh. Give the
+    # component a beat to write the cookie before we rerun into the app.
+    time.sleep(0.5)
     st.rerun()
 
 
