@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -63,6 +64,12 @@ def main(
         False, "--dry-run", help="Skip browser/LLM; write a valid 0-call suite.json and exit 0."
     ),
 ) -> None:
+    # Runs are spawned by the dashboard (subprocess), inheriting its umask. If that
+    # umask strips the execute bit, the suite_*/call_* dirs we mkdir below become
+    # untraversable (drw-------) — the dashboard then can't read its own output and
+    # the Reports/Overview pages crash with PermissionError. Force a sane umask so
+    # every dir this run creates is owner+group readable/traversable.
+    os.umask(0o022)
     setup_logging()
     s = get_settings()
     scenarios = load_library()
